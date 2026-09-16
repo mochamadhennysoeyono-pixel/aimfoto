@@ -132,8 +132,16 @@ export default function App() {
       const cached = localStorage.getItem('photobooth_cached_event_config');
       if (cached) {
         const parsed = JSON.parse(cached);
-        if (parsed && parsed.id && parsed.nama) {
+        if (
+          parsed &&
+          parsed.id &&
+          parsed.nama &&
+          parsed.nama !== 'ADMIN_CONFIG' &&
+          !parsed.nama.toUpperCase().includes('ADMIN_CONFIG')
+        ) {
           return parsed;
+        } else {
+          localStorage.removeItem('photobooth_cached_event_config');
         }
       }
     } catch (e) {
@@ -142,7 +150,7 @@ export default function App() {
 
     return {
       id: HARDCODED_EVENT_ID,
-      nama: 'SnapMoment Exclusive Event',
+      nama: 'AIM SPACE',
       subtitle: 'Simpan memori spesial Anda dengan photobooth digital beresolusi tinggi',
       tanggal: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }),
       lokasi: 'Main Ballroom & Hall',
@@ -217,6 +225,7 @@ export default function App() {
         const { data } = await supabase
           .from('events')
           .select('*')
+          .neq('name', 'ADMIN_CONFIG')
           .eq('qr_code', urlEventQr)
           .maybeSingle();
         eventData = data;
@@ -224,20 +233,35 @@ export default function App() {
         const { data } = await supabase
           .from('events')
           .select('*')
+          .neq('name', 'ADMIN_CONFIG')
           .eq('id', urlEventId)
           .maybeSingle();
         eventData = data;
       } else {
-        const { data } = await supabase
+        // Coba cari event yang dijadikan default
+        const { data: defaultEv } = await supabase
           .from('events')
           .select('*')
-          .order('created_at', { ascending: false })
-          .limit(1)
+          .neq('name', 'ADMIN_CONFIG')
+          .eq('is_default', true)
           .maybeSingle();
-        eventData = data;
+
+        if (defaultEv) {
+          eventData = defaultEv;
+        } else {
+          // Ambil event terbaru yang aktif
+          const { data: latestEv } = await supabase
+            .from('events')
+            .select('*')
+            .neq('name', 'ADMIN_CONFIG')
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          eventData = latestEv;
+        }
       }
 
-      if (eventData) {
+      if (eventData && eventData.name && eventData.name !== 'ADMIN_CONFIG') {
         // Ambil harga per sesi dari kolom default_price di database Supabase
         const sessionPrice =
           eventData.default_price !== undefined && eventData.default_price !== null
@@ -246,7 +270,7 @@ export default function App() {
 
         const config: EventConfig = {
           id: eventData.id,
-          nama: eventData.name || eventData.nama || 'Photobooth Event',
+          nama: eventData.name || eventData.nama || 'AIM SPACE',
           subtitle: eventData.deskripsi || eventData.subtitle || 'Simpan memori spesial Anda di photobooth',
           tanggal: eventData.tanggal || '',
           lokasi: eventData.lokasi || 'Kiosk Photobooth',
@@ -258,6 +282,11 @@ export default function App() {
         setOrder((prev) => ({ ...prev, harga: sessionPrice }));
         setSession((prev) => ({ ...prev, eventId: config.id }));
         localStorage.setItem('photobooth_cached_event_config', JSON.stringify(config));
+      } else {
+        const cached = localStorage.getItem('photobooth_cached_event_config');
+        if (cached && cached.includes('ADMIN_CONFIG')) {
+          localStorage.removeItem('photobooth_cached_event_config');
+        }
       }
     } catch (err) {
       console.warn('Inisialisasi Supabase event error:', err);
@@ -447,6 +476,7 @@ export default function App() {
           currentStep={currentStep}
           eventName={eventConfig.nama}
           onReset={handleResetSession}
+          onOpenAdmin={handleOpenAdmin}
         />
 
         {/* Dynamic Step Content */}

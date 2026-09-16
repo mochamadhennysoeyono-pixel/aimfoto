@@ -1,17 +1,13 @@
 /**
  * Service untuk mengelola autentikasi dan password admin photobooth.
- * Mendukung penyimpanan password kustom ke localStorage dan sinkronisasi Cloud (Supabase)
- * sehingga password tetap sinkron di versi Preview, Development, maupun Published/Production.
+ * Menggunakan localStorage dengan fallback ke env variable dan default master password ('admin123').
  */
-
-import { supabase } from '../supabaseClient';
 
 export const STORAGE_KEY = 'photobooth_admin_password';
 export const DEFAULT_PASSWORD = 'admin123';
-export const CONFIG_RECORD_ID = '00000000-0000-0000-0000-000000000001';
 
 /**
- * Dapatkan password admin default dari environment variable atau fallback bawaan
+ * Dapatkan password admin default dari environment variable atau fallback bawaan ('admin123')
  */
 export function getDefaultAdminPassword(): string {
   const env = (import.meta as any).env || {};
@@ -34,79 +30,13 @@ export function getAdminPassword(): string {
 }
 
 /**
- * Mengambil password admin yang tersimpan di Cloud (Supabase)
+ * Menyimpan password admin baru ke LocalStorage
  */
-export async function fetchAdminPasswordFromCloud(): Promise<string | null> {
-  try {
-    const { data, error } = await supabase
-      .from('events')
-      .select('qr_code')
-      .eq('id', CONFIG_RECORD_ID)
-      .maybeSingle();
-
-    if (error || !data) return null;
-
-    const qr = data.qr_code || '';
-    if (qr.startsWith('__P_')) {
-      const encoded = qr.slice(4);
-      try {
-        const decoded = atob(encoded);
-        if (decoded && decoded.trim().length > 0) {
-          // Cache ke localStorage jika lokal belum punya
-          try {
-            localStorage.setItem(STORAGE_KEY, decoded.trim());
-          } catch (_) {}
-          return decoded.trim();
-        }
-      } catch (_) {
-        return null;
-      }
-    }
-  } catch (e) {
-    console.warn('Gagal membaca password dari Supabase:', e);
-  }
-  return null;
-}
-
-/**
- * Menyimpan password admin baru (ke LocalStorage dan Cloud Supabase)
- */
-export async function setAdminPassword(
-  newPassword: string,
-  syncToCloud = true
-): Promise<boolean> {
+export async function setAdminPassword(newPassword: string): Promise<boolean> {
   try {
     const trimmed = newPassword.trim();
     if (!trimmed) return false;
-
-    // 1. Simpan ke LocalStorage browser saat ini
     localStorage.setItem(STORAGE_KEY, trimmed);
-
-    // 2. Sinkronkan ke Supabase agar versi Publish / perangkat lain langsung mengenali
-    if (syncToCloud) {
-      const encoded = btoa(trimmed);
-      Promise.resolve(
-        supabase.from('events').upsert(
-          [
-            {
-              id: CONFIG_RECORD_ID,
-              name: 'ADMIN_CONFIG',
-              qr_code: `__P_${encoded}`,
-              default_price: 0,
-              is_active: false,
-            },
-          ],
-          { onConflict: 'id' }
-        )
-      )
-        .then(({ error }: any) => {
-          if (error) {
-            console.warn('Catatan: Sinkronisasi password ke Supabase:', error.message);
-          }
-        })
-        .catch(() => {});
-    }
-
     return true;
   } catch (e) {
     console.error('Gagal menyimpan password:', e);
@@ -119,14 +49,7 @@ export async function setAdminPassword(
  */
 export async function resetAdminPassword(): Promise<boolean> {
   try {
-    // 1. Hapus dari LocalStorage
     localStorage.removeItem(STORAGE_KEY);
-
-    // 2. Hapus / reset dari Supabase
-    Promise.resolve(supabase.from('events').delete().eq('id', CONFIG_RECORD_ID))
-      .then(() => {})
-      .catch(() => {});
-
     return true;
   } catch (e) {
     console.error('Gagal mereset password di localStorage:', e);
@@ -152,36 +75,13 @@ export function isCustomAdminPassword(): boolean {
  * 1. Password bawaan default 'admin123' (selalu valid sebagai master recovery)
  * 2. Password dari environment variable
  * 3. Password yang disimpan di localStorage
- * 4. Password yang disinkronkan di Cloud Supabase
  */
 export async function verifyAdminPassword(input: string): Promise<boolean> {
-  const cleanInput = input.trim();
-  if (!cleanInput) return false;
-
-  // 1. Master Fallback: 'admin123' selalu diterima agar admin tidak terkunci
-  if (cleanInput === DEFAULT_PASSWORD) return true;
-
-  // 2. Default dari env
-  const defaultEnv = getDefaultAdminPassword();
-  if (cleanInput === defaultEnv) return true;
-
-  // 3. Password aktif di localStorage
-  const localPw = getAdminPassword();
-  if (cleanInput === localPw) return true;
-
-  // 4. Periksa apakah ada password kustom di Cloud Supabase (untuk versi publish antar perangkat)
-  try {
-    const cloudPw = await fetchAdminPasswordFromCloud();
-    if (cloudPw && cleanInput === cloudPw) {
-      return true;
-    }
-  } catch (_) {}
-
-  return false;
+  return verifyAdminPasswordSync(input);
 }
 
 /**
- * Verifikasi synchronous instan (tanpa menunggu koneksi jaringan)
+ * Verifikasi synchronous instan
  */
 export function verifyAdminPasswordSync(input: string): boolean {
   const cleanInput = input.trim();

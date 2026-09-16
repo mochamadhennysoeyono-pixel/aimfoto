@@ -14,7 +14,6 @@ import {
 import {
   verifyAdminPassword,
   verifyAdminPasswordSync,
-  fetchAdminPasswordFromCloud,
   resetAdminPassword,
   DEFAULT_PASSWORD,
 } from '../services/adminAuthService';
@@ -39,11 +38,6 @@ export const AdminGate: React.FC<AdminGateProps> = ({ onAuthenticated, onBackToK
   const [lockClickCount, setLockClickCount] = useState(0);
   const [showSecretReset, setShowSecretReset] = useState(false);
   const lockClickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Prefetch password dari Supabase saat gerbang admin dimuat
-  useEffect(() => {
-    fetchAdminPasswordFromCloud().catch(() => {});
-  }, []);
 
   // Timer countdown jika terkena lockout
   useEffect(() => {
