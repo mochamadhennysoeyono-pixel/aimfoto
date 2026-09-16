@@ -21,6 +21,7 @@ import {
   FlipConfig,
   getFlipConfig,
   saveFlipConfig,
+  fetchFlipConfigFromCloud,
   DEFAULT_FLIP_CONFIG,
   testFlipCredentials,
 } from '../services/flipService';
@@ -30,6 +31,7 @@ export const AdminPaymentFlip: React.FC = () => {
   const [config, setConfig] = useState<FlipConfig>(getFlipConfig());
   const [adminWhatsapp, setAdminWhatsapp] = useState<string>(getAdminWhatsapp());
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
   // States uji koneksi API Flip
@@ -43,14 +45,30 @@ export const AdminPaymentFlip: React.FC = () => {
   useEffect(() => {
     setConfig(getFlipConfig());
     setAdminWhatsapp(getAdminWhatsapp());
+
+    // Ambil sinkronisasi dari Cloud Supabase jika tersedia
+    fetchFlipConfigFromCloud().then((cloudConf) => {
+      if (cloudConf) {
+        setConfig((prev) => ({
+          ...prev,
+          ...cloudConf,
+          secretKey: cloudConf.secretKey || prev.secretKey,
+        }));
+      }
+    });
   }, []);
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    saveFlipConfig(config);
-    saveAdminWhatsapp(adminWhatsapp);
-    setSaveSuccess(true);
-    setTimeout(() => setSaveSuccess(false), 3000);
+    setIsSaving(true);
+    try {
+      await saveFlipConfig(config);
+      saveAdminWhatsapp(adminWhatsapp);
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleCopy = (text: string, label: string) => {
@@ -334,10 +352,15 @@ export const AdminPaymentFlip: React.FC = () => {
 
           <button
             type="submit"
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-400 text-zinc-950 font-bold text-xs sm:text-sm shadow-lg shadow-orange-500/20 transition-colors cursor-pointer"
+            disabled={isSaving}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-400 disabled:opacity-50 text-zinc-950 font-bold text-xs sm:text-sm shadow-lg shadow-orange-500/20 transition-colors cursor-pointer"
           >
-            <Save className="w-4 h-4" />
-            <span>Simpan Konfigurasi & Kontak Admin</span>
+            {isSaving ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Save className="w-4 h-4" />
+            )}
+            <span>{isSaving ? 'Menyimpan...' : 'Simpan Konfigurasi & Kontak Admin'}</span>
           </button>
         </div>
 

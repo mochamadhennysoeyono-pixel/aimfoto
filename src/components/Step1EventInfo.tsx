@@ -20,6 +20,7 @@ interface Step1EventInfoProps {
 export const Step1EventInfo: React.FC<Step1EventInfoProps> = ({
   eventConfig,
   onStart,
+  onOpenAdmin,
   onOpenLegal,
 }) => {
   const formattedPrice = new Intl.NumberFormat('id-ID', {
@@ -128,30 +129,45 @@ export const Step1EventInfo: React.FC<Step1EventInfoProps> = ({
         </button>
 
         {/* Legal Links for Flip / Payment Gateway Verification */}
-        {onOpenLegal && (
-          <div className="pt-2 border-t border-zinc-900 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[11px] text-zinc-500 font-sans">
-            <button
-              onClick={() => onOpenLegal('terms')}
-              className="hover:text-amber-400 hover:underline transition-colors cursor-pointer"
-            >
-              Syarat & Ketentuan
-            </button>
-            <span>•</span>
-            <button
-              onClick={() => onOpenLegal('refund')}
-              className="hover:text-amber-400 hover:underline transition-colors cursor-pointer"
-            >
-              Kebijakan Pengembalian (Refund)
-            </button>
-            <span>•</span>
-            <button
-              onClick={() => onOpenLegal('contact')}
-              className="hover:text-amber-400 hover:underline transition-colors cursor-pointer"
-            >
-              Hubungi Kami
-            </button>
-          </div>
-        )}
+        <div className="pt-2 border-t border-zinc-900 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[11px] text-zinc-500 font-sans">
+          {onOpenLegal && (
+            <>
+              <button
+                onClick={() => onOpenLegal('terms')}
+                className="hover:text-amber-400 hover:underline transition-colors cursor-pointer"
+              >
+                Syarat & Ketentuan
+              </button>
+              <span>•</span>
+              <button
+                onClick={() => onOpenLegal('refund')}
+                className="hover:text-amber-400 hover:underline transition-colors cursor-pointer"
+              >
+                Kebijakan Pengembalian (Refund)
+              </button>
+              <span>•</span>
+              <button
+                onClick={() => onOpenLegal('contact')}
+                className="hover:text-amber-400 hover:underline transition-colors cursor-pointer"
+              >
+                Hubungi Kami
+              </button>
+            </>
+          )}
+          {onOpenAdmin && (
+            <>
+              {onOpenLegal && <span>•</span>}
+              <button
+                id="btn-footer-operator-login"
+                onClick={onOpenAdmin}
+                className="hover:text-amber-400 hover:underline transition-colors cursor-pointer text-zinc-600 hover:text-zinc-300 flex items-center gap-1"
+                title="Login Operator Kiosk"
+              >
+                <span>Operator Kiosk</span>
+              </button>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );

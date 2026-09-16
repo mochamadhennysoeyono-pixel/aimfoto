@@ -45,9 +45,16 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   onBackToKiosk,
   onOpenKioskWithEvent,
 }) => {
-  // Authentication status from sessionStorage
+  // Authentication status from sessionStorage / localStorage
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
-    return sessionStorage.getItem('admin_authenticated') === 'true';
+    try {
+      return (
+        sessionStorage.getItem('admin_authenticated') === 'true' ||
+        localStorage.getItem('admin_authenticated_temp') === 'true'
+      );
+    } catch (_) {
+      return false;
+    }
   });
 
   // Active admin tab determined from URL path or state
@@ -93,7 +100,10 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
 
   // Logout handler
   const handleLogout = () => {
-    sessionStorage.removeItem('admin_authenticated');
+    try {
+      sessionStorage.removeItem('admin_authenticated');
+      localStorage.removeItem('admin_authenticated_temp');
+    } catch (_) {}
     setIsAuthenticated(false);
   };
 

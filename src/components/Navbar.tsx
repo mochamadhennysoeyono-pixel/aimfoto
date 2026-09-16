@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import {
   Sparkles,
   RotateCcw,
+  Lock,
 } from 'lucide-react';
 import { StepKey } from '../types';
 
@@ -32,7 +33,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onReset,
   onOpenAdmin,
 }) => {
-  // Secret gesture tap count (5 tap cepat pada nama event / status dot untuk buka portal admin)
+  // Secret gesture tap count (3 tap pada nama event untuk buka portal admin)
   const [tapCount, setTapCount] = useState(0);
   const tapTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -47,9 +48,9 @@ export const Navbar: React.FC<NavbarProps> = ({
 
     tapTimeoutRef.current = setTimeout(() => {
       setTapCount(0);
-    }, 2000);
+    }, 3000);
 
-    if (next >= 5) {
+    if (next >= 3) {
       setTapCount(0);
       onOpenAdmin();
     }
@@ -65,12 +66,13 @@ export const Navbar: React.FC<NavbarProps> = ({
   return (
     <header className="w-full bg-[#0b0d13]/95 backdrop-blur-md border-b border-zinc-800/80 sticky top-0 z-40 px-3.5 py-2.5 shrink-0 shadow-sm">
       <div className="max-w-md mx-auto flex items-center justify-between gap-2">
-        {/* Left: Secret Tap 5x untuk Operator Kiosk + Pulsing Dot + Nama Event */}
+        {/* Left: Ketuk 3x untuk Operator Kiosk + Pulsing Dot + Nama Event */}
         <button
           type="button"
           onClick={handleSecretAdminTap}
-          title={eventName || 'Photobooth Event'}
-          className="flex items-center gap-2 text-left select-none cursor-default bg-transparent border-0 p-0 focus:outline-none min-w-0"
+          style={{ touchAction: 'manipulation' }}
+          title="Ketuk 3x untuk masuk ke Admin Portal"
+          className="flex items-center gap-2 text-left select-none cursor-pointer bg-transparent border-0 p-0 focus:outline-none min-w-0 active:opacity-75 transition-opacity"
         >
           <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
           <div className="min-w-0">
@@ -85,11 +87,27 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
         </button>
 
-        {/* Right side: On Step 1 show golden badge, on other steps show progress & reset */}
+        {/* Right side */}
         {isStep1 ? (
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-[11px] font-semibold text-amber-400 font-mono shrink-0">
-            <Sparkles className="w-3 h-3 text-amber-400" />
-            <span>Self-Service Photobooth</span>
+          <div className="flex items-center gap-2 shrink-0">
+            <div className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-[11px] font-semibold text-amber-400 font-mono shrink-0">
+              <Sparkles className="w-3 h-3 text-amber-400" />
+              <span>Kiosk Siap</span>
+            </div>
+
+            {/* Tombol akses Admin untuk Operator */}
+            {onOpenAdmin && (
+              <button
+                id="btn-nav-admin"
+                type="button"
+                onClick={onOpenAdmin}
+                title="Buka Portal Admin Kiosk"
+                className="p-1.5 rounded-lg bg-zinc-900/90 border border-zinc-800 hover:border-amber-500/50 text-zinc-400 hover:text-amber-400 text-[11px] flex items-center gap-1.5 transition-all cursor-pointer shadow-sm active:scale-95"
+              >
+                <Lock className="w-3.5 h-3.5" />
+                <span className="text-[10px] font-medium hidden xs:inline">Admin</span>
+              </button>
+            )}
           </div>
         ) : (
           <div className="flex items-center gap-2 shrink-0">
@@ -119,10 +137,10 @@ export const Navbar: React.FC<NavbarProps> = ({
             <button
               id="btn-nav-reset"
               onClick={onReset}
-              className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors cursor-pointer ml-1"
-              title="Ulangi dari awal"
+              title="Reset ke awal sesi"
+              className="p-1.5 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-700 transition-colors cursor-pointer shrink-0 active:scale-95"
             >
-              <RotateCcw className="w-4 h-4" />
+              <RotateCcw className="w-3.5 h-3.5" />
             </button>
           </div>
         )}

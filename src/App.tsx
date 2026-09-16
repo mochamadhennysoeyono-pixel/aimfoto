@@ -238,22 +238,23 @@ export default function App() {
           .maybeSingle();
         eventData = data;
       } else {
-        // Coba cari event yang dijadikan default
-        const { data: defaultEv } = await supabase
+        // Ambil event AIM SPACE terlebih dahulu (ID utama)
+        const { data: aimEv } = await supabase
           .from('events')
           .select('*')
-          .neq('name', 'ADMIN_CONFIG')
-          .eq('is_default', true)
+          .eq('id', HARDCODED_EVENT_ID)
           .maybeSingle();
 
-        if (defaultEv) {
-          eventData = defaultEv;
+        if (aimEv && aimEv.is_active !== false) {
+          eventData = aimEv;
         } else {
-          // Ambil event terbaru yang aktif
+          // Ambil event aktif yang bukan baris konfigurasi sistem
           const { data: latestEv } = await supabase
             .from('events')
             .select('*')
-            .neq('name', 'ADMIN_CONFIG')
+            .eq('is_active', true)
+            .not('name', 'like', '\\_\\_%')
+            .not('qr_code', 'like', '\\_\\_%')
             .order('created_at', { ascending: false })
             .limit(1)
             .maybeSingle();
@@ -261,7 +262,7 @@ export default function App() {
         }
       }
 
-      if (eventData && eventData.name && eventData.name !== 'ADMIN_CONFIG') {
+      if (eventData && eventData.name && !eventData.name.startsWith('__') && eventData.name !== 'ADMIN_CONFIG') {
         // Ambil harga per sesi dari kolom default_price di database Supabase
         const sessionPrice =
           eventData.default_price !== undefined && eventData.default_price !== null

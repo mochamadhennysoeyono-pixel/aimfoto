@@ -103,6 +103,7 @@ export const AdminEvents: React.FC<AdminEventsProps> = ({
           (ev) =>
             ev.name !== 'ADMIN_CONFIG' &&
             !ev.name?.toUpperCase().includes('ADMIN_CONFIG') &&
+            !ev.name?.startsWith('__') &&
             ev.id !== '11111111-2222-3333-4444-555555555555' &&
             ev.id !== '00000000-0000-0000-0000-000000000001' &&
             !ev.qr_code?.startsWith('__')
