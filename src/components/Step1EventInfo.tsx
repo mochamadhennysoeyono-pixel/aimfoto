@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useRef } from 'react';
 import {
   Camera,
   Sparkles,
@@ -30,6 +30,29 @@ export const Step1EventInfo: React.FC<Step1EventInfoProps> = ({
     maximumFractionDigits: 0,
   }).format(eventConfig.hargaPerFoto ?? 0);
 
+  // Secret gesture tap count (5 tap cepat pada status badge untuk buka portal admin)
+  const [tapCount, setTapCount] = useState(0);
+  const tapTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleSecretAdminTap = () => {
+    if (!onOpenAdmin) return;
+    const next = tapCount + 1;
+    setTapCount(next);
+
+    if (tapTimeoutRef.current) {
+      clearTimeout(tapTimeoutRef.current);
+    }
+
+    tapTimeoutRef.current = setTimeout(() => {
+      setTapCount(0);
+    }, 2000);
+
+    if (next >= 5) {
+      setTapCount(0);
+      onOpenAdmin();
+    }
+  };
+
   // Tanggal hari ini otomatis langsung ditampilkan (contoh: "14 Sep 2026")
   const todayFormatted = useMemo(() => {
     try {
@@ -52,14 +75,19 @@ export const Step1EventInfo: React.FC<Step1EventInfoProps> = ({
 
   return (
     <div className="flex-1 flex flex-col justify-between max-w-xl mx-auto w-full p-4 sm:p-6 overflow-y-auto">
-      {/* Top Header Badge & Kiosk Status */}
+      {/* Top Header Badge & Kiosk Status (Secret Tap 5x untuk Operator Kiosk) */}
       <div className="flex items-center justify-between pb-3 border-b border-zinc-800/80">
-        <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={handleSecretAdminTap}
+          title="Status Kiosk"
+          className="flex items-center gap-2 text-left select-none cursor-default bg-transparent border-0 p-0 focus:outline-none"
+        >
           <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
           <span className="text-xs font-mono font-medium text-zinc-300">
             Kiosk Siap Operasi
           </span>
-        </div>
+        </button>
 
         <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-[11px] font-semibold text-amber-400 font-mono">
           <Sparkles className="w-3 h-3" />
@@ -143,17 +171,6 @@ export const Step1EventInfo: React.FC<Step1EventInfoProps> = ({
           <span>Mulai Photobooth</span>
           <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 stroke-[2.5]" />
         </button>
-
-        {onOpenAdmin && (
-          <div className="text-center pt-1">
-            <button
-              onClick={onOpenAdmin}
-              className="text-[11px] font-mono text-zinc-500 hover:text-zinc-300 transition-colors cursor-pointer"
-            >
-              ⚙️ Masuk ke Portal Admin
-            </button>
-          </div>
-        )}
 
         {/* Legal Links for Flip / Payment Gateway Verification */}
         {onOpenLegal && (

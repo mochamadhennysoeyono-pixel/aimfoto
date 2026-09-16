@@ -32,7 +32,14 @@ export default function App() {
   const [isAdminRoute, setIsAdminRoute] = useState<boolean>(() => {
     const path = window.location.pathname.toLowerCase();
     const hash = window.location.hash.toLowerCase();
-    return path.startsWith('/admin') || hash.startsWith('#/admin') || hash.startsWith('#admin');
+    const search = window.location.search.toLowerCase();
+    return (
+      path.startsWith('/admin') ||
+      hash.startsWith('#/admin') ||
+      hash.startsWith('#admin') ||
+      search.includes('admin=1') ||
+      search.includes('admin=true')
+    );
   });
 
   // Legal Modal (Terms, Refund, Contact, Privacy for Flip / Payment Gateway KYC)
@@ -64,14 +71,21 @@ export default function App() {
     setLegalModalOpen(true);
   };
 
-  // Listen for browser navigation changes
+  // Listen for browser navigation changes & secret keyboard shortcut
   useEffect(() => {
     const handleUrlChange = () => {
       const path = window.location.pathname.toLowerCase();
       const hash = window.location.hash.toLowerCase();
+      const search = window.location.search.toLowerCase();
       const combined = path + hash;
 
-      setIsAdminRoute(path.startsWith('/admin') || hash.startsWith('#/admin') || hash.startsWith('#admin'));
+      setIsAdminRoute(
+        path.startsWith('/admin') ||
+        hash.startsWith('#/admin') ||
+        hash.startsWith('#admin') ||
+        search.includes('admin=1') ||
+        search.includes('admin=true')
+      );
 
       if (
         combined.includes('terms') ||
@@ -87,11 +101,28 @@ export default function App() {
       }
     };
 
+    // Secret keyboard shortcut untuk operator kiosk: Ctrl + Alt + A atau F2
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (
+        (e.ctrlKey && e.altKey && (e.key === 'a' || e.key === 'A')) ||
+        (e.shiftKey && e.altKey && (e.key === 'a' || e.key === 'A')) ||
+        e.key === 'F2'
+      ) {
+        e.preventDefault();
+        try {
+          window.history.pushState({}, '', '/admin');
+        } catch (_) {}
+        setIsAdminRoute(true);
+      }
+    };
+
     window.addEventListener('popstate', handleUrlChange);
     window.addEventListener('hashchange', handleUrlChange);
+    window.addEventListener('keydown', handleKeyDown);
     return () => {
       window.removeEventListener('popstate', handleUrlChange);
       window.removeEventListener('hashchange', handleUrlChange);
+      window.removeEventListener('keydown', handleKeyDown);
     };
   }, []);
 

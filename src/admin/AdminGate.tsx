@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Lock,
   KeyRound,
@@ -7,11 +7,9 @@ import {
   ShieldCheck,
   ArrowLeft,
   Loader2,
-  Sparkles,
+  AlertCircle,
   RotateCcw,
   CheckCircle2,
-  AlertCircle,
-  HelpCircle,
 } from 'lucide-react';
 import {
   verifyAdminPassword,
@@ -33,22 +31,63 @@ export const AdminGate: React.FC<AdminGateProps> = ({ onAuthenticated, onBackToK
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
-  // Prefetch password dari Supabase saat komponen dimuat
+  // Brute-force protection: kunci 30 detik setelah 5 kali gagal
+  const [failedAttempts, setFailedAttempts] = useState(0);
+  const [lockoutSeconds, setLockoutSeconds] = useState(0);
+
+  // Rahasia: 5 klik pada icon gembok untuk membuka opsi darurat (hanya diketahui pemilik)
+  const [lockClickCount, setLockClickCount] = useState(0);
+  const [showSecretReset, setShowSecretReset] = useState(false);
+  const lockClickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Prefetch password dari Supabase saat gerbang admin dimuat
   useEffect(() => {
     fetchAdminPasswordFromCloud().catch(() => {});
   }, []);
 
+  // Timer countdown jika terkena lockout
+  useEffect(() => {
+    if (lockoutSeconds <= 0) return;
+    const timer = setInterval(() => {
+      setLockoutSeconds((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [lockoutSeconds]);
+
+  const handleSecretLockClick = () => {
+    const next = lockClickCount + 1;
+    setLockClickCount(next);
+
+    if (lockClickTimeoutRef.current) clearTimeout(lockClickTimeoutRef.current);
+    lockClickTimeoutRef.current = setTimeout(() => {
+      setLockClickCount(0);
+    }, 2000);
+
+    if (next >= 5) {
+      setLockClickCount(0);
+      setShowSecretReset(true);
+    }
+  };
+
   const handleVerify = async (candidate: string) => {
+    if (lockoutSeconds > 0) return;
+
     const trimmed = candidate.trim();
     if (!trimmed) {
-      setErrorMsg('Silakan masukkan password admin terlebih dahulu.');
+      setErrorMsg('Silakan masukkan password admin.');
       return;
     }
 
     setIsVerifying(true);
     setErrorMsg(null);
 
-    // Cek synchronous cepat dulu (jika cocok dengan admin123 atau cache)
+    // Cek synchronous cepat
     if (verifyAdminPasswordSync(trimmed)) {
       sessionStorage.setItem('admin_authenticated', 'true');
       setIsVerifying(false);
@@ -63,17 +102,21 @@ export const AdminGate: React.FC<AdminGateProps> = ({ onAuthenticated, onBackToK
         sessionStorage.setItem('admin_authenticated', 'true');
         onAuthenticated();
       } else {
-        setErrorMsg(
-          `Password salah. Gunakan password bawaan "${DEFAULT_PASSWORD}" atau password kustom yang pernah Anda simpan.`
-        );
+        const nextFailed = failedAttempts + 1;
+        setFailedAttempts(nextFailed);
+        if (nextFailed >= 5) {
+          setLockoutSeconds(30);
+          setErrorMsg('Terlalu banyak percobaan gagal. Akses diblokir selama 30 detik.');
+        } else {
+          setErrorMsg('Password salah. Silakan coba lagi.');
+        }
       }
-    } catch (err: any) {
-      // Fallback
+    } catch (_) {
       if (trimmed === DEFAULT_PASSWORD) {
         sessionStorage.setItem('admin_authenticated', 'true');
         onAuthenticated();
       } else {
-        setErrorMsg('Gagal memverifikasi password. Coba gunakan: ' + DEFAULT_PASSWORD);
+        setErrorMsg('Password salah. Silakan coba lagi.');
       }
     } finally {
       setIsVerifying(false);
@@ -85,33 +128,34 @@ export const AdminGate: React.FC<AdminGateProps> = ({ onAuthenticated, onBackToK
     handleVerify(passwordInput);
   };
 
-  const handleUseDefaultPassword = () => {
-    setPasswordInput(DEFAULT_PASSWORD);
-    setErrorMsg(null);
-    handleVerify(DEFAULT_PASSWORD);
-  };
-
-  const handleResetPassword = async () => {
+  const handleSecretResetAction = async () => {
     setIsVerifying(true);
     setErrorMsg(null);
     await resetAdminPassword();
-    setPasswordInput(DEFAULT_PASSWORD);
     setIsVerifying(false);
-    setSuccessMsg(`Password berhasil dikembalikan ke bawaan: ${DEFAULT_PASSWORD}`);
+    setShowSecretReset(false);
+    setFailedAttempts(0);
+    setLockoutSeconds(0);
+    setSuccessMsg('Password admin berhasil direset ke bawaan pabrik.');
     setTimeout(() => setSuccessMsg(null), 4000);
   };
 
   return (
     <div className="min-h-screen bg-[#07080c] text-zinc-100 flex flex-col items-center justify-center p-4 selection:bg-amber-500 selection:text-zinc-950 font-sans">
       <div className="w-full max-w-md bg-[#0e1118] border border-zinc-800/80 rounded-2xl p-6 sm:p-8 shadow-2xl relative">
-        {/* Header Icon */}
+        {/* Header Icon (Secret gesture 5x klik untuk reset darurat jika pemilik lupa) */}
         <div className="flex flex-col items-center text-center mb-6">
-          <div className="w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center mb-3 shadow-inner">
+          <button
+            type="button"
+            onClick={handleSecretLockClick}
+            className="w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center mb-3 shadow-inner cursor-default select-none focus:outline-none"
+            title="Admin Portal"
+          >
             <Lock className="w-7 h-7" />
-          </div>
+          </button>
           <h1 className="text-xl font-bold text-white tracking-tight">Portal Admin Photobooth</h1>
           <p className="text-xs text-zinc-400 mt-1 max-w-xs leading-relaxed">
-            Akses khusus pengelola kiosk. Masukkan password admin untuk mengelola event, frame layout, dan transaksi.
+            Hanya untuk staf pengelola kiosk.
           </p>
         </div>
 
@@ -123,25 +167,40 @@ export const AdminGate: React.FC<AdminGateProps> = ({ onAuthenticated, onBackToK
           </div>
         )}
 
+        {/* Opsi Darurat Tersembunyi (Hanya muncul jika logo gembok diklik 5x berturut-turut) */}
+        {showSecretReset && (
+          <div className="mb-4 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs space-y-2 animate-in fade-in">
+            <div className="flex items-center justify-between text-amber-400 font-semibold">
+              <span>Mode Pemulihan Darurat</span>
+              <button
+                type="button"
+                onClick={() => setShowSecretReset(false)}
+                className="text-zinc-400 hover:text-white"
+              >
+                ✕
+              </button>
+            </div>
+            <p className="text-[11px] text-zinc-400 leading-relaxed">
+              Jika Anda lupa password, klik tombol di bawah untuk mengembalikan password ke nilai bawaan pabrik.
+            </p>
+            <button
+              type="button"
+              onClick={handleSecretResetAction}
+              className="w-full py-1.5 px-3 rounded-lg bg-amber-500 hover:bg-amber-400 text-zinc-950 font-bold text-[11px] flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>Reset Password Sekarang</span>
+            </button>
+          </div>
+        )}
+
         {/* Password Form */}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <label className="text-xs font-semibold text-zinc-300 flex items-center gap-1.5">
-                <KeyRound className="w-3.5 h-3.5 text-amber-400" />
-                <span>Password Admin</span>
-              </label>
-
-              <button
-                type="button"
-                onClick={handleUseDefaultPassword}
-                className="text-[11px] text-amber-400 hover:text-amber-300 hover:underline flex items-center gap-1 cursor-pointer transition-colors"
-                title="Isi otomatis dengan password bawaan"
-              >
-                <Sparkles className="w-3 h-3" />
-                <span>Gunakan bawaan ({DEFAULT_PASSWORD})</span>
-              </button>
-            </div>
+            <label className="block text-xs font-semibold text-zinc-300 mb-1.5 flex items-center gap-1.5">
+              <KeyRound className="w-3.5 h-3.5 text-amber-400" />
+              <span>Password Admin</span>
+            </label>
 
             <div className="relative">
               <input
@@ -152,9 +211,9 @@ export const AdminGate: React.FC<AdminGateProps> = ({ onAuthenticated, onBackToK
                   setPasswordInput(e.target.value);
                   if (errorMsg) setErrorMsg(null);
                 }}
-                placeholder="Ketik password admin..."
+                placeholder="Masukkan kata sandi..."
                 autoFocus
-                disabled={isVerifying}
+                disabled={isVerifying || lockoutSeconds > 0}
                 className="w-full px-3.5 py-2.5 pr-10 rounded-xl bg-zinc-950/80 border border-zinc-800 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-all font-mono disabled:opacity-50"
               />
               <button
@@ -170,36 +229,15 @@ export const AdminGate: React.FC<AdminGateProps> = ({ onAuthenticated, onBackToK
             {errorMsg && (
               <div className="mt-2 p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-xs text-rose-300 flex items-start gap-2 animate-in fade-in">
                 <AlertCircle className="w-4 h-4 shrink-0 text-rose-400 mt-0.5" />
-                <div className="space-y-1.5 flex-1">
-                  <p className="leading-relaxed">{errorMsg}</p>
-                  <button
-                    type="button"
-                    onClick={handleResetPassword}
-                    className="text-[11px] font-semibold text-amber-400 hover:text-amber-300 underline flex items-center gap-1 cursor-pointer"
-                  >
-                    <RotateCcw className="w-3 h-3" />
-                    <span>Reset kata sandi ke bawaan ({DEFAULT_PASSWORD})</span>
-                  </button>
-                </div>
+                <p className="leading-relaxed flex-1">{errorMsg}</p>
               </div>
             )}
-          </div>
-
-          {/* Quick Info Bawaan */}
-          <div className="p-2.5 rounded-xl bg-zinc-950/60 border border-zinc-800/80 text-[11px] text-zinc-400 flex items-center justify-between">
-            <span className="flex items-center gap-1.5">
-              <HelpCircle className="w-3.5 h-3.5 text-zinc-500" />
-              <span>Password Default Bawaan:</span>
-            </span>
-            <code className="px-2 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-amber-400 font-mono font-bold">
-              {DEFAULT_PASSWORD}
-            </code>
           </div>
 
           <button
             id="btn-admin-login"
             type="submit"
-            disabled={isVerifying}
+            disabled={isVerifying || lockoutSeconds > 0}
             className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-zinc-950 font-bold text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 active:scale-[0.98] transition-all cursor-pointer disabled:opacity-50"
           >
             {isVerifying ? (
@@ -207,6 +245,8 @@ export const AdminGate: React.FC<AdminGateProps> = ({ onAuthenticated, onBackToK
                 <Loader2 className="w-4 h-4 animate-spin text-zinc-950" />
                 <span>Memverifikasi...</span>
               </>
+            ) : lockoutSeconds > 0 ? (
+              <span>Tunggu {lockoutSeconds} detik...</span>
             ) : (
               <>
                 <ShieldCheck className="w-4 h-4" />
