@@ -15,12 +15,14 @@ interface Step1EventInfoProps {
   eventConfig: EventConfig;
   onStart: () => void;
   onOpenAdmin?: () => void;
+  onOpenLegal?: (tab: 'terms' | 'refund' | 'contact' | 'privacy') => void;
 }
 
 export const Step1EventInfo: React.FC<Step1EventInfoProps> = ({
   eventConfig,
   onStart,
   onOpenAdmin,
+  onOpenLegal,
 }) => {
   const formattedPrice = new Intl.NumberFormat('id-ID', {
     style: 'currency',
@@ -143,12 +145,38 @@ export const Step1EventInfo: React.FC<Step1EventInfoProps> = ({
         </button>
 
         {onOpenAdmin && (
-          <div className="text-center">
+          <div className="text-center pt-1">
             <button
               onClick={onOpenAdmin}
               className="text-[11px] font-mono text-zinc-500 hover:text-zinc-300 transition-colors cursor-pointer"
             >
               ⚙️ Masuk ke Portal Admin
+            </button>
+          </div>
+        )}
+
+        {/* Legal Links for Flip / Payment Gateway Verification */}
+        {onOpenLegal && (
+          <div className="pt-2 border-t border-zinc-900 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[11px] text-zinc-500 font-sans">
+            <button
+              onClick={() => onOpenLegal('terms')}
+              className="hover:text-amber-400 hover:underline transition-colors cursor-pointer"
+            >
+              Syarat & Ketentuan
+            </button>
+            <span>•</span>
+            <button
+              onClick={() => onOpenLegal('refund')}
+              className="hover:text-amber-400 hover:underline transition-colors cursor-pointer"
+            >
+              Kebijakan Pengembalian (Refund)
+            </button>
+            <span>•</span>
+            <button
+              onClick={() => onOpenLegal('contact')}
+              className="hover:text-amber-400 hover:underline transition-colors cursor-pointer"
+            >
+              Hubungi Kami
             </button>
           </div>
         )}

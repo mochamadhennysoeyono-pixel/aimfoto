@@ -10,6 +10,7 @@ import { Step7Overlay } from './components/Step7Overlay';
 import { Step8PreviewLocked } from './components/Step8PreviewLocked';
 import { Step9Checkout } from './components/Step9Checkout';
 import { Step10FinalSuccess } from './components/Step10FinalSuccess';
+import { LegalInfoModal, LegalTab } from './components/LegalInfoModal';
 import { AdminPortal } from './admin/AdminPortal';
 import {
   StepKey,
@@ -34,12 +35,56 @@ export default function App() {
     return path.startsWith('/admin') || hash.startsWith('#/admin') || hash.startsWith('#admin');
   });
 
+  // Legal Modal (Terms, Refund, Contact, Privacy for Flip / Payment Gateway KYC)
+  const [legalModalOpen, setLegalModalOpen] = useState<boolean>(() => {
+    const path = window.location.pathname.toLowerCase();
+    const hash = window.location.hash.toLowerCase();
+    return (
+      path.includes('terms') ||
+      hash.includes('terms') ||
+      path.includes('refund') ||
+      hash.includes('refund') ||
+      path.includes('contact') ||
+      hash.includes('contact') ||
+      path.includes('privacy') ||
+      hash.includes('privacy')
+    );
+  });
+
+  const [legalInitialTab, setLegalInitialTab] = useState<LegalTab>(() => {
+    const combined = (window.location.pathname + window.location.hash).toLowerCase();
+    if (combined.includes('refund')) return 'refund';
+    if (combined.includes('contact')) return 'contact';
+    if (combined.includes('privacy')) return 'privacy';
+    return 'terms';
+  });
+
+  const handleOpenLegal = (tab: LegalTab) => {
+    setLegalInitialTab(tab);
+    setLegalModalOpen(true);
+  };
+
   // Listen for browser navigation changes
   useEffect(() => {
     const handleUrlChange = () => {
       const path = window.location.pathname.toLowerCase();
       const hash = window.location.hash.toLowerCase();
+      const combined = path + hash;
+
       setIsAdminRoute(path.startsWith('/admin') || hash.startsWith('#/admin') || hash.startsWith('#admin'));
+
+      if (
+        combined.includes('terms') ||
+        combined.includes('refund') ||
+        combined.includes('contact') ||
+        combined.includes('privacy')
+      ) {
+        if (combined.includes('refund')) setLegalInitialTab('refund');
+        else if (combined.includes('contact')) setLegalInitialTab('contact');
+        else if (combined.includes('privacy')) setLegalInitialTab('privacy');
+        else setLegalInitialTab('terms');
+        setLegalModalOpen(true);
+      }
     };
 
     window.addEventListener('popstate', handleUrlChange);
@@ -381,6 +426,7 @@ export default function App() {
               eventConfig={eventConfig}
               onStart={handleStartFromInfo}
               onOpenAdmin={handleOpenAdmin}
+              onOpenLegal={handleOpenLegal}
             />
           )}
 
@@ -490,6 +536,7 @@ export default function App() {
               eventConfig={eventConfig}
               onPaymentSuccess={handlePaymentSuccess}
               onBack={() => setCurrentStep('preview-locked')}
+              onOpenLegal={handleOpenLegal}
             />
           )}
 
@@ -506,6 +553,13 @@ export default function App() {
           )}
         </main>
       </div>
+
+      {/* Global Legal Information Modal (Terms, Refund, Contact, Privacy) */}
+      <LegalInfoModal
+        isOpen={legalModalOpen}
+        initialTab={legalInitialTab}
+        onClose={() => setLegalModalOpen(false)}
+      />
     </div>
   );
 }

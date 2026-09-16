@@ -23,6 +23,7 @@ interface Step9CheckoutProps {
   eventConfig: EventConfig;
   onPaymentSuccess: (order: PhotoboothOrder) => void;
   onBack: () => void;
+  onOpenLegal?: (tab: 'terms' | 'refund' | 'contact' | 'privacy') => void;
 }
 
 export const Step9Checkout: React.FC<Step9CheckoutProps> = ({
@@ -31,6 +32,7 @@ export const Step9Checkout: React.FC<Step9CheckoutProps> = ({
   eventConfig,
   onPaymentSuccess,
   onBack,
+  onOpenLegal,
 }) => {
   const [selectedMethod, setSelectedMethod] = useState<'QRIS' | 'GOPAY' | 'VA'>('QRIS');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -270,6 +272,28 @@ export const Step9Checkout: React.FC<Step9CheckoutProps> = ({
         <p className="text-[10px] text-center text-zinc-500 font-mono">
           Kiosk otomatis mendeteksi status settlement dalam 3-5 detik
         </p>
+
+        {onOpenLegal && (
+          <p className="text-[10px] text-center text-zinc-500 pt-1 leading-normal">
+            Dengan melanjutkan transaksi, Anda menyetujui{' '}
+            <button
+              type="button"
+              onClick={() => onOpenLegal('terms')}
+              className="text-amber-400 hover:underline cursor-pointer"
+            >
+              Syarat & Ketentuan
+            </button>{' '}
+            dan{' '}
+            <button
+              type="button"
+              onClick={() => onOpenLegal('refund')}
+              className="text-amber-400 hover:underline cursor-pointer"
+            >
+              Kebijakan Refund
+            </button>{' '}
+            AimBoth.
+          </p>
+        )}
       </div>
     </div>
   );
