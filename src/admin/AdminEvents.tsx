@@ -98,9 +98,12 @@ export const AdminEvents: React.FC<AdminEventsProps> = ({
         console.warn('Error fetching events:', error.message);
         setErrorMsg(`Gagal memuat events: ${error.message}`);
       } else if (data) {
-        // Filter out any internal diagnostic rows
+        // Filter out any internal diagnostic or config rows
         const cleanedData = (data as AdminEventItem[]).filter(
-          (ev) => ev.id !== '11111111-2222-3333-4444-555555555555'
+          (ev) =>
+            ev.id !== '11111111-2222-3333-4444-555555555555' &&
+            ev.id !== '00000000-0000-0000-0000-000000000001' &&
+            !ev.qr_code?.startsWith('__')
         );
         setEvents(cleanedData);
         // Cari event yang memiliki is_default = true di Supabase

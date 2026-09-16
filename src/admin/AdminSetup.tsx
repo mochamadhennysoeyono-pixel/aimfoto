@@ -66,7 +66,7 @@ export const AdminSetup: React.FC = () => {
     }
   };
 
-  const handleSaveNewPassword = (e: React.FormEvent) => {
+  const handleSaveNewPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
     setSuccessMsg(null);
@@ -94,22 +94,22 @@ export const AdminSetup: React.FC = () => {
       return;
     }
 
-    const ok = setAdminPassword(trimmedNew);
+    const ok = await setAdminPassword(trimmedNew);
     if (ok) {
       refreshPasswordState();
       setNewPassword('');
       setConfirmPassword('');
-      setSuccessMsg('Password admin berhasil diubah! Password baru sekarang langsung aktif.');
+      setSuccessMsg('Password admin berhasil diubah! Password baru sekarang langsung aktif dan tersinkronisasi.');
       setTestResult(null);
       setTestPasswordInput('');
       setTimeout(() => setSuccessMsg(null), 5000);
     } else {
-      setErrorMsg('Terjadi kesalahan saat menyimpan password ke penyimpanan lokal.');
+      setErrorMsg('Terjadi kesalahan saat menyimpan password ke penyimpanan.');
     }
   };
 
-  const handleResetToDefault = () => {
-    const ok = resetAdminPassword();
+  const handleResetToDefault = async () => {
+    const ok = await resetAdminPassword();
     if (ok) {
       refreshPasswordState();
       setShowResetConfirmModal(false);
