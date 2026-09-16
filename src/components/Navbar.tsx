@@ -2,7 +2,6 @@ import React, { useState, useRef } from 'react';
 import {
   Sparkles,
   RotateCcw,
-  Lock,
 } from 'lucide-react';
 import { StepKey } from '../types';
 
@@ -66,13 +65,12 @@ export const Navbar: React.FC<NavbarProps> = ({
   return (
     <header className="w-full bg-[#0b0d13]/95 backdrop-blur-md border-b border-zinc-800/80 sticky top-0 z-40 px-3.5 py-2.5 shrink-0 shadow-sm">
       <div className="max-w-md mx-auto flex items-center justify-between gap-2">
-        {/* Left: Ketuk 3x untuk Operator Kiosk + Pulsing Dot + Nama Event */}
+        {/* Left: Nama Event & Status */}
         <button
           type="button"
           onClick={handleSecretAdminTap}
           style={{ touchAction: 'manipulation' }}
-          title="Ketuk 3x untuk masuk ke Admin Portal"
-          className="flex items-center gap-2 text-left select-none cursor-pointer bg-transparent border-0 p-0 focus:outline-none min-w-0 active:opacity-75 transition-opacity"
+          className="flex items-center gap-2 text-left select-none cursor-default bg-transparent border-0 p-0 focus:outline-none min-w-0"
         >
           <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
           <div className="min-w-0">
@@ -90,24 +88,10 @@ export const Navbar: React.FC<NavbarProps> = ({
         {/* Right side */}
         {isStep1 ? (
           <div className="flex items-center gap-2 shrink-0">
-            <div className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-[11px] font-semibold text-amber-400 font-mono shrink-0">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-[11px] font-semibold text-amber-400 font-mono shrink-0">
               <Sparkles className="w-3 h-3 text-amber-400" />
               <span>Kiosk Siap</span>
             </div>
-
-            {/* Tombol akses Admin untuk Operator */}
-            {onOpenAdmin && (
-              <button
-                id="btn-nav-admin"
-                type="button"
-                onClick={onOpenAdmin}
-                title="Buka Portal Admin Kiosk"
-                className="p-1.5 rounded-lg bg-zinc-900/90 border border-zinc-800 hover:border-amber-500/50 text-zinc-400 hover:text-amber-400 text-[11px] flex items-center gap-1.5 transition-all cursor-pointer shadow-sm active:scale-95"
-              >
-                <Lock className="w-3.5 h-3.5" />
-                <span className="text-[10px] font-medium hidden xs:inline">Admin</span>
-              </button>
-            )}
           </div>
         ) : (
           <div className="flex items-center gap-2 shrink-0">

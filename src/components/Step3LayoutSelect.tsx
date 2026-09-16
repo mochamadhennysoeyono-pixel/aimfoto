@@ -163,27 +163,17 @@ export const Step3LayoutSelect: React.FC<Step3LayoutSelectProps> = ({
               Belum Ada Varian Layout Frame
             </h3>
             <p className="text-xs text-zinc-400 max-w-sm leading-relaxed">
-              Tema <strong className="text-amber-300 font-semibold">&quot;{selectedTheme.name}&quot;</strong> belum memiliki file desain PNG frame yang dihubungkan ke layout. Silakan tambahkan varian layout di menu Admin.
+              Tema <strong className="text-amber-300 font-semibold">&quot;{selectedTheme.name}&quot;</strong> sedang menyiapkan varian layout frame. Silakan coba pilih tema lain.
             </p>
 
             <div className="flex flex-wrap items-center justify-center gap-2.5 mt-2">
               <button
                 onClick={onBack}
-                className="px-3.5 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-medium text-xs flex items-center gap-1.5 transition-colors cursor-pointer border border-zinc-700"
+                className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-zinc-950 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-lg shadow-amber-500/20"
               >
                 <ArrowLeft className="w-3.5 h-3.5" />
                 <span>Pilih Tema Frame Lain</span>
               </button>
-              {onOpenAdmin && (
-                <button
-                  id="btn-go-to-admin-frame-variants"
-                  onClick={onOpenAdmin}
-                  className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-zinc-950 font-bold text-xs flex items-center gap-2 transition-all cursor-pointer shadow-lg shadow-amber-500/20"
-                >
-                  <PlusCircle className="w-4 h-4" />
-                  <span>Hubungkan Layout di Admin</span>
-                </button>
-              )}
             </div>
           </div>
         ) : (

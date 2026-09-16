@@ -154,19 +154,6 @@ export const Step1EventInfo: React.FC<Step1EventInfoProps> = ({
               </button>
             </>
           )}
-          {onOpenAdmin && (
-            <>
-              {onOpenLegal && <span>•</span>}
-              <button
-                id="btn-footer-operator-login"
-                onClick={onOpenAdmin}
-                className="hover:text-amber-400 hover:underline transition-colors cursor-pointer text-zinc-600 hover:text-zinc-300 flex items-center gap-1"
-                title="Login Operator Kiosk"
-              >
-                <span>Operator Kiosk</span>
-              </button>
-            </>
-          )}
         </div>
       </div>
     </div>

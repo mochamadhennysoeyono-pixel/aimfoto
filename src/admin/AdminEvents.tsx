@@ -18,14 +18,17 @@ import {
   X,
   Star,
   Edit2,
+  MapPin,
 } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import { generateUuid } from '../utils/uuid';
+import { fetchEventsMetadata, saveEventMetadata } from '../services/eventMetaService';
 
 export interface AdminEventItem {
   id: string;
   name: string;
   qr_code: string;
+  lokasi?: string;
   default_price?: number;
   is_active?: boolean;
   is_default?: boolean;
@@ -71,7 +74,8 @@ export const AdminEvents: React.FC<AdminEventsProps> = ({
   const [showAddForm, setShowAddForm] = useState(false);
   const [formName, setFormName] = useState('');
   const [formQrCode, setFormQrCode] = useState('');
-  const [formDefaultPrice, setFormDefaultPrice] = useState('5000');
+  const [formLokasi, setFormLokasi] = useState('');
+  const [formDefaultPrice, setFormDefaultPrice] = useState('10000');
   const [formIsActive, setFormIsActive] = useState(true);
   const [formIsDefault, setFormIsDefault] = useState(false);
   const [createdEventLink, setCreatedEventLink] = useState<{ name: string; link: string } | null>(null);
@@ -80,7 +84,8 @@ export const AdminEvents: React.FC<AdminEventsProps> = ({
   const [editingEvent, setEditingEvent] = useState<AdminEventItem | null>(null);
   const [editName, setEditName] = useState('');
   const [editQrCode, setEditQrCode] = useState('');
-  const [editDefaultPrice, setEditDefaultPrice] = useState('5000');
+  const [editLokasi, setEditLokasi] = useState('');
+  const [editDefaultPrice, setEditDefaultPrice] = useState('10000');
   const [editIsActive, setEditIsActive] = useState(true);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
 
@@ -89,10 +94,16 @@ export const AdminEvents: React.FC<AdminEventsProps> = ({
     setIsLoading(true);
     setErrorMsg(null);
     try {
-      const { data, error } = await supabase
-        .from('events')
-        .select('*')
-        .order('created_at', { ascending: false });
+      // Ambil events dan metadata lokasi secara bersamaan
+      const [eventsResult, metaMap] = await Promise.all([
+        supabase
+          .from('events')
+          .select('*')
+          .order('created_at', { ascending: false }),
+        fetchEventsMetadata(),
+      ]);
+
+      const { data, error } = eventsResult;
 
       if (error) {
         console.warn('Error fetching events:', error.message);
@@ -107,7 +118,11 @@ export const AdminEvents: React.FC<AdminEventsProps> = ({
             ev.id !== '11111111-2222-3333-4444-555555555555' &&
             ev.id !== '00000000-0000-0000-0000-000000000001' &&
             !ev.qr_code?.startsWith('__')
-        );
+        ).map((ev) => ({
+          ...ev,
+          lokasi: metaMap[ev.id]?.lokasi || (ev as any).lokasi || '',
+        }));
+
         setEvents(cleanedData);
         // Cari event yang memiliki is_default = true di Supabase
         const foundDefault = cleanedData.find((ev) => ev.is_default);
@@ -161,7 +176,7 @@ export const AdminEvents: React.FC<AdminEventsProps> = ({
 
     const newId = generateUuid();
     const cleanQr = formQrCode.trim().toLowerCase().replace(/[^a-z0-9-_]/g, '-');
-    const parsedPrice = parseInt(formDefaultPrice, 10) || 5000;
+    const parsedPrice = parseInt(formDefaultPrice, 10) || 10000;
 
     const payload: Record<string, any> = {
       id: newId,
@@ -200,11 +215,28 @@ export const AdminEvents: React.FC<AdminEventsProps> = ({
           setErrorMsg(`Gagal menambah event: ${error.message}`);
         }
       } else {
+        // Simpan metadata lokasi jika diisi
+        if (formLokasi.trim()) {
+          await saveEventMetadata(newId, {
+            lokasi: formLokasi.trim(),
+          });
+        }
+
         // Jika dicentang sebagai default event
         if (formIsDefault) {
           try {
             localStorage.setItem('photobooth_default_event_id', newId);
             setDefaultEventId(newId);
+            // Simpan cache event utama
+            localStorage.setItem(
+              'photobooth_cached_event_config',
+              JSON.stringify({
+                id: newId,
+                nama: formName.trim(),
+                lokasi: formLokasi.trim() || 'Photobooth Station',
+                hargaPerFoto: parsedPrice,
+              })
+            );
             // Coba un-default event lain di Supabase jika kolom is_default ada
             await supabase.from('events').update({ is_default: false }).neq('id', newId);
           } catch (storageErr) {
@@ -221,6 +253,7 @@ export const AdminEvents: React.FC<AdminEventsProps> = ({
         );
         setFormName('');
         setFormQrCode('');
+        setFormLokasi('');
         setFormIsDefault(false);
         setShowAddForm(false);
         fetchEvents();
@@ -275,7 +308,7 @@ export const AdminEvents: React.FC<AdminEventsProps> = ({
     setSuccessMsg(null);
 
     const cleanQr = editQrCode.trim().toLowerCase().replace(/[^a-z0-9-_]/g, '-');
-    const parsedPrice = parseInt(editDefaultPrice, 10) || 5000;
+    const parsedPrice = parseInt(editDefaultPrice, 10) || 10000;
 
     try {
       const { error } = await supabase
@@ -290,6 +323,11 @@ export const AdminEvents: React.FC<AdminEventsProps> = ({
 
       if (error) throw error;
 
+      // Simpan metadata lokasi ke row __EVENTS_META__
+      await saveEventMetadata(editingEvent.id, {
+        lokasi: editLokasi.trim(),
+      });
+
       // Update state event di tabel
       setEvents((prev) =>
         prev.map((ev) =>
@@ -298,6 +336,7 @@ export const AdminEvents: React.FC<AdminEventsProps> = ({
                 ...ev,
                 name: editName.trim(),
                 qr_code: cleanQr,
+                lokasi: editLokasi.trim(),
                 default_price: parsedPrice,
                 is_active: editIsActive,
               }
@@ -305,27 +344,54 @@ export const AdminEvents: React.FC<AdminEventsProps> = ({
         )
       );
 
-      // Sinkronkan ke cache localStorage jika event ini sedang aktif
+      // Sinkronkan ke cache localStorage & dispatch event untuk update realtime
       try {
         const cached = localStorage.getItem('photobooth_cached_event_config');
+        let shouldUpdate = false;
+        let baseObj: any = {};
+
         if (cached) {
-          const parsed = JSON.parse(cached);
-          if (parsed.id === editingEvent.id) {
-            localStorage.setItem(
-              'photobooth_cached_event_config',
-              JSON.stringify({
-                ...parsed,
-                nama: editName.trim(),
-                hargaPerFoto: parsedPrice,
-              })
-            );
+          baseObj = JSON.parse(cached);
+          if (
+            baseObj.id === editingEvent.id ||
+            editingEvent.id === 'f1723176-eaa7-4c1d-bfc9-2c112677bb38' ||
+            editingEvent.id === defaultEventId ||
+            editingEvent.is_default
+          ) {
+            shouldUpdate = true;
           }
+        } else {
+          shouldUpdate = true;
         }
+
+        if (shouldUpdate) {
+          localStorage.setItem(
+            'photobooth_cached_event_config',
+            JSON.stringify({
+              ...baseObj,
+              id: editingEvent.id,
+              nama: editName.trim(),
+              lokasi: editLokasi.trim() || 'AIM SPACE Studio',
+              hargaPerFoto: parsedPrice,
+            })
+          );
+        }
+
+        window.dispatchEvent(
+          new CustomEvent('photobooth_event_updated', {
+            detail: {
+              id: editingEvent.id,
+              price: parsedPrice,
+              name: editName.trim(),
+              lokasi: editLokasi.trim(),
+            },
+          })
+        );
       } catch (e) {
         // ignore
       }
 
-      setSuccessMsg(`Perubahan event "${editName.trim()}" (Harga Per Sesi: Rp ${parsedPrice.toLocaleString('id-ID')}) berhasil disimpan.`);
+      setSuccessMsg(`Perubahan event "${editName.trim()}" (Harga: Rp ${parsedPrice.toLocaleString('id-ID')}, Lokasi: "${editLokasi.trim() || 'Default'}") berhasil disimpan.`);
       setEditingEvent(null);
     } catch (err: any) {
       setErrorMsg(`Gagal menyimpan perubahan event: ${err.message}`);
@@ -419,6 +485,7 @@ export const AdminEvents: React.FC<AdminEventsProps> = ({
   // Set event as default public event
   const handleSetAsDefault = async (ev: AdminEventItem) => {
     try {
+      const selectedPrice = ev.default_price !== undefined && ev.default_price !== null ? Number(ev.default_price) : 10000;
       localStorage.setItem('photobooth_default_event_id', ev.id);
       try {
         localStorage.setItem(
@@ -428,9 +495,19 @@ export const AdminEvents: React.FC<AdminEventsProps> = ({
             nama: ev.name,
             subtitle: (ev as any).description || 'Simpan kenangan indah Anda di booth digital',
             tanggal: (ev as any).date || '',
-            lokasi: (ev as any).location || 'Photobooth Kiosk',
-            hargaPerFoto: ev.default_price ?? 5000,
+            lokasi: ev.lokasi || (ev as any).location || 'AIM SPACE Studio',
+            hargaPerFoto: selectedPrice,
             tipeEvent: (ev as any).event_type || '',
+          })
+        );
+        window.dispatchEvent(
+          new CustomEvent('photobooth_event_updated', {
+            detail: {
+              id: ev.id,
+              price: selectedPrice,
+              name: ev.name,
+              lokasi: ev.lokasi || 'AIM SPACE Studio',
+            },
           })
         );
       } catch (e) {
@@ -649,12 +726,31 @@ export const AdminEvents: React.FC<AdminEventsProps> = ({
                 step="1000"
                 value={formDefaultPrice}
                 onChange={(e) => setFormDefaultPrice(e.target.value)}
-                placeholder="5000"
+                placeholder="10000"
                 className="w-full px-3 py-2 rounded-xl bg-zinc-950 border border-zinc-800 text-xs text-white font-mono placeholder-zinc-600 focus:outline-none focus:border-amber-500"
               />
             </div>
 
-            <div className="flex items-center gap-3 pt-4">
+            <div>
+              <label className="block text-xs font-semibold text-zinc-300 mb-1">
+                Lokasi / Venue Acara
+              </label>
+              <div className="relative">
+                <input
+                  type="text"
+                  value={formLokasi}
+                  onChange={(e) => setFormLokasi(e.target.value)}
+                  placeholder="Contoh: AIM SPACE Studio / Grand Ballroom Lt. 2"
+                  className="w-full pl-8 pr-3 py-2 rounded-xl bg-zinc-950 border border-zinc-800 text-xs text-white placeholder-zinc-600 focus:outline-none focus:border-amber-500"
+                />
+                <MapPin className="w-3.5 h-3.5 text-zinc-500 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              </div>
+              <p className="text-[10px] text-zinc-500 mt-1">
+                Ditampilkan di layar utama kiosk sebagai tempat/venue event photobooth.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3 pt-2">
               <label className="flex items-center gap-2 text-xs text-zinc-300 cursor-pointer">
                 <input
                   type="checkbox"
@@ -775,7 +871,7 @@ export const AdminEvents: React.FC<AdminEventsProps> = ({
                     style: 'currency',
                     currency: 'IDR',
                     maximumFractionDigits: 0,
-                  }).format(ev.default_price ?? 5000);
+                  }).format(ev.default_price ?? 10000);
 
                   const formattedDate = ev.created_at
                     ? new Date(ev.created_at).toLocaleDateString('id-ID', {
@@ -803,7 +899,13 @@ export const AdminEvents: React.FC<AdminEventsProps> = ({
                             </span>
                           )}
                         </div>
-                        <span className="text-[10px] font-mono text-zinc-500 block truncate max-w-[180px]">
+                        {ev.lokasi && (
+                          <div className="flex items-center gap-1 text-[11px] text-zinc-400 mt-0.5">
+                            <MapPin className="w-3 h-3 text-amber-400 shrink-0" />
+                            <span className="truncate max-w-[180px]">{ev.lokasi}</span>
+                          </div>
+                        )}
+                        <span className="text-[10px] font-mono text-zinc-500 block truncate max-w-[180px] mt-0.5">
                           ID: {ev.id}
                         </span>
                       </td>
@@ -897,7 +999,8 @@ export const AdminEvents: React.FC<AdminEventsProps> = ({
                               setEditingEvent(ev);
                               setEditName(ev.name);
                               setEditQrCode(ev.qr_code);
-                              setEditDefaultPrice(String(ev.default_price ?? 5000));
+                              setEditLokasi(ev.lokasi || '');
+                              setEditDefaultPrice(String(ev.default_price ?? 10000));
                               setEditIsActive(ev.is_active ?? true);
                             }}
                             className="p-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white border border-zinc-800 transition-colors cursor-pointer"
@@ -990,6 +1093,25 @@ export const AdminEvents: React.FC<AdminEventsProps> = ({
                 />
                 <p className="text-[11px] text-zinc-500 mt-1">
                   Harga ini otomatis menjadi tarif sesi yang muncul di kiosk publik dan halaman checkout.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-zinc-400 font-medium mb-1">
+                  Lokasi / Tempat Acara (Venue)
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={editLokasi}
+                    onChange={(e) => setEditLokasi(e.target.value)}
+                    placeholder="Contoh: AIM SPACE Studio / Ballroom Lt. 2"
+                    className="w-full pl-8 pr-3 py-2 rounded-xl bg-zinc-950 border border-zinc-800 text-white placeholder-zinc-600 focus:outline-none focus:border-amber-500"
+                  />
+                  <MapPin className="w-3.5 h-3.5 text-zinc-500 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                </div>
+                <p className="text-[11px] text-zinc-500 mt-1">
+                  Lokasi ini akan langsung tampil di kolom &quot;Lokasi&quot; pada halaman utama publik / kiosk.
                 </p>
               </div>
 

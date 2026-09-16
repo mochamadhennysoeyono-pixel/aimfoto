@@ -189,10 +189,11 @@ export const Step9Checkout: React.FC<Step9CheckoutProps> = ({
     setFlipErrorMessage(null);
 
     try {
+      const checkoutAmount = Number(order.harga) || Number(eventConfig.hargaPerFoto) || 10000;
       const res = await createFlipBill({
         orderId: order.id || session.id,
         title: `Photobooth - ${eventConfig.nama || 'AimBoth'}`,
-        amount: order.harga || 25000,
+        amount: checkoutAmount,
       });
 
       if (res.success && res.paymentUrl) {

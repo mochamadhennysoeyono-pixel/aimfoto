@@ -26,6 +26,7 @@ import { FILTER_PRESETS } from './data/filters';
 import { DEFAULT_LAYOUTS } from './data/defaultLayouts';
 import { generateUuid } from './utils/uuid';
 import { supabase, HARDCODED_EVENT_ID } from './supabaseClient';
+import { fetchEventsMetadata, getCachedEventMetadata } from './services/eventMetaService';
 
 export default function App() {
   // Check if current route is /admin
@@ -148,13 +149,14 @@ export default function App() {
       // ignore
     }
 
+    const cachedMeta = getCachedEventMetadata(HARDCODED_EVENT_ID);
     return {
       id: HARDCODED_EVENT_ID,
       nama: 'AIM SPACE',
       subtitle: 'Simpan memori spesial Anda dengan photobooth digital beresolusi tinggi',
       tanggal: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }),
-      lokasi: 'Main Ballroom & Hall',
-      hargaPerFoto: 5000,
+      lokasi: cachedMeta?.lokasi || 'AIM SPACE Studio',
+      hargaPerFoto: 10000,
       tipeEvent: 'Exhibition & Celebration',
     };
   });
@@ -207,7 +209,7 @@ export default function App() {
   const [order, setOrder] = useState<PhotoboothOrder>(() => ({
     id: generateUuid(),
     sessionId: session?.id || generateUuid(),
-    harga: eventConfig.hargaPerFoto || 25000,
+    harga: eventConfig.hargaPerFoto || 10000,
     statusPembayaran: 'pending',
     waktuCheckout: '',
   }));
@@ -225,6 +227,7 @@ export default function App() {
         const { data } = await supabase
           .from('events')
           .select('*')
+          .not('name', 'like', '\\_\\_%')
           .neq('name', 'ADMIN_CONFIG')
           .eq('qr_code', urlEventQr)
           .maybeSingle();
@@ -233,22 +236,54 @@ export default function App() {
         const { data } = await supabase
           .from('events')
           .select('*')
+          .not('name', 'like', '\\_\\_%')
           .neq('name', 'ADMIN_CONFIG')
           .eq('id', urlEventId)
           .maybeSingle();
         eventData = data;
       } else {
-        // Ambil event AIM SPACE terlebih dahulu (ID utama)
-        const { data: aimEv } = await supabase
-          .from('events')
-          .select('*')
-          .eq('id', HARDCODED_EVENT_ID)
-          .maybeSingle();
+        // 1. Cek default event id yang disimpan di localStorage oleh admin
+        const savedDefaultId = localStorage.getItem('photobooth_default_event_id');
+        if (savedDefaultId) {
+          const { data: defSaved } = await supabase
+            .from('events')
+            .select('*')
+            .eq('id', savedDefaultId)
+            .maybeSingle();
+          if (defSaved && defSaved.is_active !== false) {
+            eventData = defSaved;
+          }
+        }
 
-        if (aimEv && aimEv.is_active !== false) {
-          eventData = aimEv;
-        } else {
-          // Ambil event aktif yang bukan baris konfigurasi sistem
+        // 2. Cek event yang memiliki is_default = true di database Supabase
+        if (!eventData) {
+          const { data: dbDefault } = await supabase
+            .from('events')
+            .select('*')
+            .eq('is_default', true)
+            .eq('is_active', true)
+            .not('name', 'like', '\\_\\_%')
+            .maybeSingle();
+          if (dbDefault) {
+            eventData = dbDefault;
+          }
+        }
+
+        // 3. Cek event AIM SPACE utama (HARDCODED_EVENT_ID)
+        if (!eventData) {
+          const { data: aimEv } = await supabase
+            .from('events')
+            .select('*')
+            .eq('id', HARDCODED_EVENT_ID)
+            .maybeSingle();
+
+          if (aimEv && aimEv.is_active !== false) {
+            eventData = aimEv;
+          }
+        }
+
+        // 4. Ambil event aktif manapun yang bukan baris konfigurasi sistem
+        if (!eventData) {
           const { data: latestEv } = await supabase
             .from('events')
             .select('*')
@@ -267,16 +302,21 @@ export default function App() {
         const sessionPrice =
           eventData.default_price !== undefined && eventData.default_price !== null
             ? Number(eventData.default_price)
-            : (Number(eventData.harga_per_foto) || 5000);
+            : (Number(eventData.harga_per_foto) || 10000);
+
+        // Ambil metadata dinamis (lokasi, subtitle, dll) dari Supabase / cache
+        const metaMap = await fetchEventsMetadata();
+        const eventMeta = metaMap[eventData.id] || {};
+        const dynamicLocation = eventMeta.lokasi || (eventData as any).lokasi || 'AIM SPACE Studio';
 
         const config: EventConfig = {
           id: eventData.id,
           nama: eventData.name || eventData.nama || 'AIM SPACE',
-          subtitle: eventData.deskripsi || eventData.subtitle || 'Simpan memori spesial Anda di photobooth',
-          tanggal: eventData.tanggal || '',
-          lokasi: eventData.lokasi || 'Kiosk Photobooth',
+          subtitle: eventMeta.subtitle || eventData.deskripsi || eventData.subtitle || 'Simpan memori spesial Anda dengan photobooth digital beresolusi tinggi',
+          tanggal: eventMeta.tanggal || eventData.tanggal || new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }),
+          lokasi: dynamicLocation,
           hargaPerFoto: sessionPrice,
-          tipeEvent: eventData.tipe || '',
+          tipeEvent: eventData.tipe || 'Exhibition & Celebration',
         };
 
         setEventConfig(config);
@@ -285,7 +325,7 @@ export default function App() {
         localStorage.setItem('photobooth_cached_event_config', JSON.stringify(config));
       } else {
         const cached = localStorage.getItem('photobooth_cached_event_config');
-        if (cached && cached.includes('ADMIN_CONFIG')) {
+        if (cached && (cached.includes('ADMIN_CONFIG') || cached.includes('__SYSTEM_CONFIG__'))) {
           localStorage.removeItem('photobooth_cached_event_config');
         }
       }
@@ -294,9 +334,68 @@ export default function App() {
     }
   }, []);
 
+  // Listen to Supabase Realtime changes & focus events for instantaneous price sync
   useEffect(() => {
     loadSupabaseEvent();
+
+    const handleFocus = () => {
+      loadSupabaseEvent();
+    };
+
+    const handleCustomEventUpdate = (e: any) => {
+      if (e?.detail?.price) {
+        const newPrice = Number(e.detail.price);
+        setEventConfig((prev) => ({ ...prev, hargaPerFoto: newPrice }));
+        setOrder((prev) => ({ ...prev, harga: newPrice }));
+      }
+      if (e?.detail?.lokasi !== undefined) {
+        setEventConfig((prev) => ({ ...prev, lokasi: e.detail.lokasi }));
+      }
+      if (e?.detail?.name) {
+        setEventConfig((prev) => ({ ...prev, nama: e.detail.name }));
+      }
+      loadSupabaseEvent();
+    };
+
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('storage', handleFocus);
+    window.addEventListener('photobooth_event_updated', handleCustomEventUpdate);
+
+    let channel: any = null;
+    try {
+      channel = supabase
+        .channel('realtime_events_changes')
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'events' },
+          () => {
+            loadSupabaseEvent();
+          }
+        )
+        .subscribe();
+    } catch (err) {
+      console.warn('Supabase realtime subscription failed:', err);
+    }
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('storage', handleFocus);
+      window.removeEventListener('photobooth_event_updated', handleCustomEventUpdate);
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
+    };
   }, [loadSupabaseEvent]);
+
+  // Keep order price in sync with eventConfig
+  useEffect(() => {
+    if (eventConfig.hargaPerFoto && order.statusPembayaran === 'pending') {
+      setOrder((prev) => ({
+        ...prev,
+        harga: eventConfig.hargaPerFoto,
+      }));
+    }
+  }, [eventConfig.hargaPerFoto, order.statusPembayaran]);
 
   // Reset to initial clean state for next guest
   const handleResetSession = () => {
@@ -318,7 +417,7 @@ export default function App() {
     setOrder({
       id: generateUuid(),
       sessionId: newSessionId,
-      harga: eventConfig.hargaPerFoto || 25000,
+      harga: eventConfig.hargaPerFoto || 10000,
       statusPembayaran: 'pending',
       waktuCheckout: '',
     });
@@ -441,6 +540,7 @@ export default function App() {
       window.history.pushState({}, '', '/');
     } catch (e) {}
     setIsAdminRoute(false);
+    loadSupabaseEvent();
   };
 
   const handleOpenKioskWithEvent = (qrCode: string) => {

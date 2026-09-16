@@ -218,7 +218,13 @@ export async function createFlipBill(params: {
   error?: string;
   httpStatus?: number;
 }> {
-  const config = getFlipConfig();
+  let config = getFlipConfig();
+  if (!config.secretKey) {
+    const cloud = await fetchFlipConfigFromCloud();
+    if (cloud?.secretKey) {
+      config = cloud;
+    }
+  }
   const cleanKey = (config.secretKey || '').trim();
 
   // Jika belum mengisi Secret Key resmi dari dashboard Flip
@@ -248,7 +254,7 @@ export async function createFlipBill(params: {
       title: params.title || 'Photobooth Session',
       type: 'SINGLE',
       amount: params.amount.toString(),
-      step: '3', // Direct to payment selection (QRIS, VA, E-Wallet)
+      step: '2', // Flip standard checkout page (QRIS, VA, E-Wallet) - tidak membutuhkan param sender_bank
       sender_name: params.senderName || 'Pengunjung Photobooth',
       sender_email: params.senderEmail || 'pengunjung@aimspace.my.id',
     };
@@ -269,18 +275,38 @@ export async function createFlipBill(params: {
     if (!response.ok) {
       const errText = await response.text();
       console.warn('Flip API Error response:', response.status, errText);
+
+      let cleanMessage = `Gagal membuat tagihan di Flip (${response.status}): ${errText}`;
+      try {
+        const parsedErr = JSON.parse(errText);
+        if (parsedErr?.errors && Array.isArray(parsedErr.errors) && parsedErr.errors.length > 0) {
+          cleanMessage = parsedErr.errors.map((e: any) => e.message || e.attribute).join(', ');
+        } else if (parsedErr?.message) {
+          cleanMessage = parsedErr.message;
+        }
+      } catch (_) {}
+
       return {
         success: false,
         httpStatus: response.status,
         error:
           response.status === 401
             ? 'API Secret Key Flip tidak valid atau tidak cocok dengan mode yang dipilih (Sandbox vs Live).'
-            : `Gagal membuat tagihan di Flip (${response.status}): ${errText}`,
+            : cleanMessage,
       };
     }
 
     const data: FlipBillResponse = await response.json();
-    const actualPaymentUrl = data.link_url || data.payment_url;
+    let actualPaymentUrl = data.link_url || data.payment_url || '';
+
+    // Pastikan URL pembayaran memiliki protokol https:// agar dapat dimuat di iframe/popup browser
+    if (
+      actualPaymentUrl &&
+      !actualPaymentUrl.startsWith('http://') &&
+      !actualPaymentUrl.startsWith('https://')
+    ) {
+      actualPaymentUrl = `https://${actualPaymentUrl}`;
+    }
 
     return {
       success: true,
@@ -305,7 +331,13 @@ export async function checkFlipBillStatus(billId: string | number): Promise<{
   status: 'ACTIVE' | 'INACTIVE' | 'SUCCESSFUL' | 'UNKNOWN';
   raw?: any;
 }> {
-  const config = getFlipConfig();
+  let config = getFlipConfig();
+  if (!config.secretKey) {
+    const cloud = await fetchFlipConfigFromCloud();
+    if (cloud?.secretKey) {
+      config = cloud;
+    }
+  }
   const cleanKey = (config.secretKey || '').trim();
   if (!cleanKey) {
     return { success: false, status: 'UNKNOWN' };

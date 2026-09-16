@@ -172,26 +172,16 @@ export const Step2ThemeSelect: React.FC<Step2ThemeSelectProps> = ({
               Belum Ada Tema Frame
             </h3>
             <p className="text-xs text-zinc-400 max-w-sm leading-relaxed">
-              Tema frame belum dibuat atau diupload di sistem. Silakan buat tema frame dan upload file desain frame PNG terlebih dahulu melalui menu Admin.
+              Tema frame sedang disiapkan. Silakan muat ulang atau tunggu beberapa saat.
             </p>
 
             <div className="flex flex-wrap items-center justify-center gap-2.5 mt-2">
-              {onOpenAdmin && (
-                <button
-                  id="btn-go-to-admin-frames"
-                  onClick={onOpenAdmin}
-                  className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-zinc-950 font-bold text-xs flex items-center gap-2 transition-all cursor-pointer shadow-lg shadow-amber-500/20"
-                >
-                  <PlusCircle className="w-4 h-4" />
-                  <span>Upload & Buat Frame di Admin</span>
-                </button>
-              )}
               <button
                 onClick={loadThemes}
-                className="px-3.5 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-medium text-xs flex items-center gap-1.5 transition-colors cursor-pointer border border-zinc-700"
+                className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-zinc-950 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-lg shadow-amber-500/20"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
-                <span>Cek Ulang</span>
+                <span>Muat Ulang Tema</span>
               </button>
             </div>
           </div>
