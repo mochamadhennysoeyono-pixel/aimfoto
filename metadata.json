@@ -1,0 +1,10 @@
+{
+  "name": "Remix Photobooth Kiosk",
+  "description": "Aplikasi photobooth digital kiosk mobile-first untuk event dengan kamera langsung, filter real-time, overlay frame, preview watermark, checkout, dan cetak.",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

@@ -1,0 +1,179 @@
+import React, { useState } from 'react';
+import { Sparkles, Check, ArrowRight, ArrowLeft } from 'lucide-react';
+import { FilterPreset } from '../types';
+import { FILTER_PRESETS } from '../data/filters';
+
+interface Step5FiltersProps {
+  photos: string[];
+  selectedFilterId: string;
+  onSelectFilter: (filterId: string) => void;
+  onNext: () => void;
+  onBack: () => void;
+}
+
+export const Step5Filters: React.FC<Step5FiltersProps> = ({
+  photos = [],
+  selectedFilterId,
+  onSelectFilter,
+  onNext,
+  onBack,
+}) => {
+  const allPhotos = photos.length > 0 ? photos : [''];
+  const [activePhotoIndex, setActivePhotoIndex] = useState(0);
+
+  const currentPhoto = allPhotos[activePhotoIndex] || allPhotos[0];
+  const activePreset =
+    FILTER_PRESETS.find((f) => f.id === selectedFilterId) || FILTER_PRESETS[0];
+
+  return (
+    <div className="flex-1 flex flex-col justify-between max-w-md mx-auto w-full p-4 overflow-y-auto">
+      {/* Header */}
+      <div>
+        <div className="flex items-center justify-between pb-2 border-b border-zinc-800">
+          <button
+            onClick={onBack}
+            className="inline-flex items-center gap-1.5 text-xs text-zinc-400 hover:text-white transition-colors cursor-pointer"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span>Ulangi Sesi Foto</span>
+          </button>
+
+          <span className="text-[11px] font-mono text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2.5 py-0.5 rounded-full">
+            Langkah 5 dari 10
+          </span>
+        </div>
+
+        <div className="text-center pt-3 pb-2">
+          <p className="text-[11px] font-mono tracking-widest text-amber-400 uppercase mb-0.5">
+            Step 5: Filter Warna
+          </p>
+          <h2 className="text-lg font-bold text-white tracking-tight flex items-center justify-center gap-1.5">
+            <Sparkles className="w-4 h-4 text-amber-400" />
+            Pilih Sentuhan Warna
+          </h2>
+          <p className="text-xs text-zinc-400">
+            Preset filter akan diterapkan ke seluruh {allPhotos.length} foto Anda
+          </p>
+        </div>
+      </div>
+
+      {/* Main Preview with Live CSS / Canvas Filter */}
+      <div className="relative w-full aspect-[4/5] max-h-[46vh] bg-zinc-950 rounded-2xl overflow-hidden border border-zinc-800 shadow-2xl flex items-center justify-center my-auto">
+        <div className="relative w-full h-full">
+          {currentPhoto ? (
+            <img
+              src={currentPhoto}
+              alt="Preview Filter"
+              className="w-full h-full object-cover transition-all duration-300"
+              style={{ filter: activePreset.cssFilter }}
+            />
+          ) : (
+            <div className="w-full h-full bg-zinc-900 flex items-center justify-center text-zinc-600 text-xs">
+              Tidak ada foto
+            </div>
+          )}
+
+          {/* Optional Tint Overlay */}
+          {activePreset.tint && (
+            <div
+              className="absolute inset-0 pointer-events-none transition-opacity duration-300"
+              style={{
+                backgroundColor: `rgba(${activePreset.tint.r}, ${activePreset.tint.g}, ${activePreset.tint.b}, ${activePreset.tint.alpha})`,
+              }}
+            />
+          )}
+
+          {/* Filter Name Watermark Pill */}
+          <div className="absolute bottom-3 left-3 px-3 py-1 rounded-lg bg-black/70 backdrop-blur-md border border-white/10 text-xs text-white flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-amber-400" />
+            <span className="font-semibold">{activePreset.nama}</span>
+            <span className="text-zinc-400 text-[10px] hidden sm:inline">
+              — {activePreset.tagline}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Multiple Photos Selector */}
+      {allPhotos.length > 1 && (
+        <div className="flex items-center gap-2 py-1.5 overflow-x-auto scrollbar-none">
+          <span className="text-[10px] font-mono text-zinc-400 shrink-0">Pilih Foto:</span>
+          {allPhotos.map((p, idx) => (
+            <button
+              key={idx}
+              onClick={() => setActivePhotoIndex(idx)}
+              className={`w-9 h-9 rounded-lg overflow-hidden border shrink-0 transition-all cursor-pointer ${
+                activePhotoIndex === idx
+                  ? 'border-amber-400 ring-2 ring-amber-400/40 scale-105'
+                  : 'border-zinc-800 opacity-60 hover:opacity-100'
+              }`}
+            >
+              <img src={p} alt={`Foto ${idx + 1}`} className="w-full h-full object-cover" />
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Filter Presets Carousel */}
+      <div className="py-2">
+        <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
+          {FILTER_PRESETS.map((preset) => {
+            const isSelected = activePreset.id === preset.id;
+
+            return (
+              <button
+                key={preset.id}
+                id={`btn-filter-${preset.id}`}
+                onClick={() => onSelectFilter(preset.id)}
+                className={`relative flex flex-col items-center p-1.5 rounded-xl border transition-all cursor-pointer ${
+                  isSelected
+                    ? 'border-amber-400 bg-amber-500/10 ring-2 ring-amber-400/30'
+                    : 'border-zinc-800 bg-zinc-900/60 hover:border-zinc-700'
+                }`}
+              >
+                <div className="w-full aspect-square rounded-lg overflow-hidden relative bg-zinc-950 mb-1">
+                  {currentPhoto ? (
+                    <img
+                      src={currentPhoto}
+                      alt={preset.nama}
+                      className="w-full h-full object-cover"
+                      style={{ filter: preset.cssFilter }}
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-zinc-800" />
+                  )}
+                  {isSelected && (
+                    <div className="absolute inset-0 bg-amber-500/30 flex items-center justify-center">
+                      <div className="w-4 h-4 rounded-full bg-amber-400 text-zinc-950 flex items-center justify-center shadow">
+                        <Check className="w-2.5 h-2.5 stroke-[3]" />
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <span
+                  className={`text-[10px] font-medium truncate w-full text-center ${
+                    isSelected ? 'text-amber-300 font-bold' : 'text-zinc-400'
+                  }`}
+                >
+                  {preset.nama}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Bottom Actions */}
+      <div className="pt-2 border-t border-zinc-800 flex items-center gap-3">
+        <button
+          id="btn-confirm-filter"
+          onClick={onNext}
+          className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-zinc-950 font-bold text-xs shadow-lg shadow-amber-500/20 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+        >
+          <span>Lanjut: Penataan ke Slot</span>
+          <ArrowRight className="w-4 h-4 stroke-[2.5]" />
+        </button>
+      </div>
+    </div>
+  );
+};
