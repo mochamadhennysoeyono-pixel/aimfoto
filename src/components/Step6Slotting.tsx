@@ -102,9 +102,9 @@ export const Step6Slotting: React.FC<Step6SlottingProps> = ({
   };
 
   return (
-    <div className="flex-1 flex flex-col justify-between max-w-md mx-auto w-full p-4 overflow-y-auto">
+    <div className="flex-1 flex flex-col justify-between max-w-lg mx-auto w-full p-3 sm:p-4 min-h-0 overflow-y-auto">
       {/* Header Bar */}
-      <div>
+      <div className="shrink-0">
         <div className="flex items-center justify-between pb-2 border-b border-zinc-800">
           <button
             onClick={onBack}
@@ -119,11 +119,11 @@ export const Step6Slotting: React.FC<Step6SlottingProps> = ({
           </span>
         </div>
 
-        <div className="text-center pt-3 pb-2">
+        <div className="text-center pt-2.5 pb-1.5">
           <p className="text-[11px] font-mono tracking-widest text-amber-400 uppercase mb-0.5">
             Step 6: Penataan ke Slot
           </p>
-          <h2 className="text-lg font-bold text-white tracking-tight flex items-center justify-center gap-1.5">
+          <h2 className="text-base sm:text-lg font-bold text-white tracking-tight flex items-center justify-center gap-1.5">
             <LayoutGrid className="w-4 h-4 text-amber-400" />
             Tata Posisi Foto di Grid
           </h2>
@@ -140,12 +140,12 @@ export const Step6Slotting: React.FC<Step6SlottingProps> = ({
       </div>
 
       {/* Main Canvas Slotting Area */}
-      <div className="relative w-full max-h-[50vh] bg-zinc-950 rounded-2xl overflow-hidden border border-zinc-800 shadow-2xl flex items-center justify-center my-auto p-3">
+      <div className="relative w-full flex-1 flex items-center justify-center my-2 p-3 min-h-[300px] max-h-[52vh] bg-zinc-950 rounded-2xl overflow-hidden border border-zinc-800 shadow-2xl">
         <div
           className="relative max-h-full max-w-full rounded-xl overflow-hidden bg-zinc-900 border border-zinc-800 shadow-inner"
           style={{
             aspectRatio: `${layout.canvas_width || 1200} / ${layout.canvas_height || 1800}`,
-            height: '46vh',
+            height: '100%',
           }}
         >
           {/* Render each slot in exact percentage coordinates */}
@@ -205,7 +205,7 @@ export const Step6Slotting: React.FC<Step6SlottingProps> = ({
       </div>
 
       {/* Quick Layout Adjustment Controls */}
-      <div className="flex items-center justify-center gap-2 py-2">
+      <div className="flex items-center justify-center gap-2 py-2 shrink-0">
         <button
           onClick={handleReverseOrder}
           className="px-3 py-1.5 rounded-xl bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 text-zinc-300 text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
@@ -224,7 +224,7 @@ export const Step6Slotting: React.FC<Step6SlottingProps> = ({
       </div>
 
       {/* Bottom Actions */}
-      <div className="pt-2 border-t border-zinc-800 flex items-center gap-3">
+      <div className="pt-2 pb-1 border-t border-zinc-800 flex items-center gap-3 shrink-0">
         <button
           id="btn-confirm-slotting"
           onClick={onNext}

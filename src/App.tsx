@@ -410,7 +410,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#07080c] text-zinc-100 flex flex-col items-center justify-start selection:bg-amber-500 selection:text-zinc-950 font-sans">
       {/* Mobile-first centered phone/kiosk canvas wrapper */}
-      <div className="w-full max-w-lg min-h-screen flex flex-col bg-[#0b0d13] border-x border-zinc-800/60 shadow-2xl relative">
+      <div className="w-full max-w-lg h-screen flex flex-col bg-[#0b0d13] border-x border-zinc-800/60 shadow-2xl relative overflow-hidden">
         {/* Persistent Top Bar */}
         <Navbar
           currentStep={currentStep}
@@ -419,7 +419,7 @@ export default function App() {
         />
 
         {/* Dynamic Step Content */}
-        <main className="flex-1 flex flex-col">
+        <main className="flex-1 flex flex-col min-h-0 overflow-y-auto">
           {/* STEP 1: Info Event */}
           {(currentStep === 'event-info' || currentStep === 'landing') && (
             <Step1EventInfo
@@ -534,6 +534,9 @@ export default function App() {
               session={session}
               order={order}
               eventConfig={eventConfig}
+              layout={activeLayout}
+              filter={activeFilter}
+              frameUrl={activeFramePngUrl}
               onPaymentSuccess={handlePaymentSuccess}
               onBack={() => setCurrentStep('preview-locked')}
               onOpenLegal={handleOpenLegal}

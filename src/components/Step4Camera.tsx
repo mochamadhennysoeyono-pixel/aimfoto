@@ -403,12 +403,12 @@ export const Step4Camera: React.FC<Step4CameraProps> = ({
   };
 
   return (
-    <div className="flex-1 flex flex-col justify-between max-w-lg mx-auto w-full p-4 overflow-y-auto">
+    <div className="flex-1 flex flex-col justify-between max-w-lg mx-auto w-full p-3 sm:p-4 min-h-0 overflow-y-auto">
       {/* Offscreen Canvas for capture */}
       <canvas ref={canvasRef} className="hidden" />
 
       {/* Top Header & Progress */}
-      <div>
+      <div className="shrink-0">
         <div className="flex items-center justify-between pb-2 border-b border-zinc-800">
           <button
             onClick={onBack}
@@ -454,8 +454,8 @@ export const Step4Camera: React.FC<Step4CameraProps> = ({
         </div>
       </div>
 
-      {/* Live Viewfinder & Countdown Area */}
-      <div className="relative w-full aspect-[3/4] bg-zinc-950 rounded-2xl overflow-hidden border border-zinc-800 shadow-2xl my-1 flex items-center justify-center">
+      {/* Live Viewfinder & Countdown Area: Kotak 1:1 (aspect-square) di semua tempat */}
+      <div className="relative w-full aspect-square bg-zinc-950 rounded-2xl overflow-hidden border border-zinc-800 shadow-2xl my-2 flex items-center justify-center shrink-0 select-none">
         {/* Flash overlay */}
         {isFlashing && <div className="absolute inset-0 bg-white z-30 animate-out fade-out" />}
 
@@ -465,7 +465,7 @@ export const Step4Camera: React.FC<Step4CameraProps> = ({
           autoPlay
           playsInline
           muted
-          className={`w-full h-full object-cover ${facingMode === 'user' ? 'scale-x-[-1]' : ''}`}
+          className={`w-full h-full object-cover pointer-events-none ${facingMode === 'user' ? 'scale-x-[-1]' : ''}`}
         />
 
         {/* Live AR Filter Canvas Overlay (perfectly synchronizes over video) */}
@@ -528,6 +528,28 @@ export const Step4Camera: React.FC<Step4CameraProps> = ({
           </div>
         </div>
 
+        {/* Floating Shutter Overlay Button inside Viewfinder */}
+        {!isComplete && !cameraError && (
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="absolute bottom-3 left-0 right-0 flex flex-col items-center justify-center gap-1 z-10 pointer-events-none"
+          >
+            <button
+              id="btn-take-photo-overlay"
+              disabled={countdown !== null}
+              onClick={handleTriggerCapture}
+              className="pointer-events-auto w-14 h-14 rounded-full border-4 border-white/90 p-1 flex items-center justify-center transition-transform active:scale-90 hover:scale-105 shadow-2xl shadow-black/90 cursor-pointer disabled:opacity-50 hover:border-amber-400"
+            >
+              <div className="w-full h-full rounded-full bg-amber-500 hover:bg-amber-400 flex items-center justify-center text-zinc-950 transition-colors">
+                <Camera className="w-5 h-5" />
+              </div>
+            </button>
+            <span className="text-[10px] font-mono font-medium text-white/90 bg-black/60 backdrop-blur-sm px-2.5 py-0.5 rounded-full tracking-wide">
+              Ambil Foto
+            </span>
+          </div>
+        )}
+
         {/* Camera Error / Permission Banner */}
         {cameraError && (
           <div className="absolute inset-0 bg-zinc-950/95 p-6 flex flex-col items-center justify-center text-center gap-3 z-20">
@@ -553,7 +575,7 @@ export const Step4Camera: React.FC<Step4CameraProps> = ({
       </div>
 
       {/* AR Live Face Filter Carousel Selector */}
-      <div className="my-1.5">
+      <div className="my-1.5 shrink-0">
         <ARFilterSelector
           selectedFilter={selectedARFilter}
           onSelectFilter={setSelectedARFilter}
@@ -562,7 +584,7 @@ export const Step4Camera: React.FC<Step4CameraProps> = ({
       </div>
 
       {/* Captured Photos Thumbnail Tray */}
-      <div className="my-1">
+      <div className="my-1 shrink-0">
         <div className="flex items-center justify-between text-[11px] font-mono text-zinc-400 mb-1">
           <span>Hasil Jepretan ({capturedPhotos.length}/{targetPhotoCount}):</span>
           {capturedPhotos.length > 0 && (
@@ -622,23 +644,9 @@ export const Step4Camera: React.FC<Step4CameraProps> = ({
         className="hidden"
       />
 
-      {/* Shutter & Main Action Buttons */}
-      <div className="pt-2 border-t border-zinc-800 flex flex-col gap-2">
-        {!isComplete ? (
-          <div className="flex items-center justify-center gap-4">
-            {/* Shutter Button */}
-            <button
-              id="btn-take-photo"
-              disabled={countdown !== null}
-              onClick={handleTriggerCapture}
-              className="w-16 h-16 rounded-full border-4 border-amber-400/60 p-1 flex items-center justify-center transition-transform active:scale-90 hover:scale-105 shadow-xl shadow-amber-500/20 cursor-pointer disabled:opacity-50"
-            >
-              <div className="w-full h-full rounded-full bg-amber-500 flex items-center justify-center">
-                <Camera className="w-6 h-6 text-zinc-950" />
-              </div>
-            </button>
-          </div>
-        ) : (
+      {/* Bottom Main Action Button when all photos are complete */}
+      {isComplete && (
+        <div className="pt-2 pb-1 border-t border-zinc-800 flex flex-col gap-2 shrink-0">
           <button
             id="btn-proceed-to-filters"
             onClick={handleProceed}
@@ -647,8 +655,8 @@ export const Step4Camera: React.FC<Step4CameraProps> = ({
             <span>Lanjut ke Filter Warna ({targetPhotoCount} Foto Siap)</span>
             <ChevronRight className="w-4 h-4 stroke-[2.5]" />
           </button>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 };

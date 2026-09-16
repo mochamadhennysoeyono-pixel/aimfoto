@@ -66,9 +66,9 @@ export const Step8PreviewLocked: React.FC<Step8PreviewLockedProps> = ({
   }).format(price);
 
   return (
-    <div className="flex-1 flex flex-col justify-between max-w-md mx-auto w-full p-4 overflow-y-auto">
+    <div className="flex-1 flex flex-col justify-between max-w-md mx-auto w-full p-4 min-h-0 overflow-y-auto">
       {/* Top Header */}
-      <div>
+      <div className="shrink-0">
         <div className="flex items-center justify-between pb-2 border-b border-zinc-800">
           <button
             onClick={onBack}
@@ -83,22 +83,22 @@ export const Step8PreviewLocked: React.FC<Step8PreviewLockedProps> = ({
           </span>
         </div>
 
-        <div className="text-center pt-3 pb-2">
+        <div className="text-center pt-2 pb-1.5">
           <p className="text-[11px] font-mono tracking-widest text-amber-400 uppercase mb-0.5">
             Step 8: Pratinjau Terkunci
           </p>
-          <h2 className="text-lg font-bold text-white tracking-tight flex items-center justify-center gap-1.5">
+          <h2 className="text-base font-bold text-white tracking-tight flex items-center justify-center gap-1.5">
             <Lock className="w-4 h-4 text-amber-400" />
             Pratinjau Hasil Cetak
           </h2>
-          <p className="text-xs text-zinc-400 font-mono">
+          <p className="text-[11px] text-zinc-400 font-mono">
             Watermark keamanan akan otomatis dihapus setelah pembayaran
           </p>
         </div>
       </div>
 
       {/* Watermarked Photo Container */}
-      <div className="relative w-full flex-1 flex items-center justify-center my-auto min-h-[38vh] max-h-[50vh] p-1">
+      <div className="relative w-full flex-1 flex items-center justify-center my-2 min-h-[260px] max-h-[50vh] overflow-hidden">
         {isLoading || !watermarkedImg ? (
           <div className="w-full h-full max-w-xs flex flex-col items-center justify-center gap-2 text-zinc-400 bg-zinc-950 rounded-2xl border border-zinc-800">
             <div className="w-8 h-8 rounded-full border-2 border-amber-400 border-t-transparent animate-spin" />
@@ -106,17 +106,16 @@ export const Step8PreviewLocked: React.FC<Step8PreviewLockedProps> = ({
           </div>
         ) : (
           <div
-            className="relative max-h-full max-w-full rounded-2xl overflow-hidden bg-zinc-950 border border-zinc-800 shadow-2xl select-none protected-preview flex items-center justify-center"
+            className="relative h-full max-h-[46vh] max-w-full rounded-2xl overflow-hidden bg-zinc-950 border border-zinc-800 shadow-2xl select-none protected-preview flex items-center justify-center"
             style={{
               aspectRatio: `${layout.canvas_width || 1200} / ${layout.canvas_height || 1800}`,
-              height: '100%',
             }}
             onContextMenu={(e) => e.preventDefault()}
           >
             <img
               src={watermarkedImg}
               alt="Protected Preview"
-              className="w-full h-full object-contain pointer-events-none"
+              className="w-full h-full max-h-[46vh] object-contain pointer-events-none"
               draggable={false}
             />
 
@@ -130,9 +129,9 @@ export const Step8PreviewLocked: React.FC<Step8PreviewLockedProps> = ({
       </div>
 
       {/* Price & Guarantee Pill */}
-      <div className="flex items-center justify-between p-3 rounded-xl bg-zinc-900/80 border border-zinc-800 my-2">
+      <div className="shrink-0 flex items-center justify-between p-2.5 rounded-xl bg-zinc-900/80 border border-zinc-800 my-1.5">
         <div className="flex items-center gap-2">
-          <div className="p-2 rounded-lg bg-amber-500/10 text-amber-400">
+          <div className="p-1.5 rounded-lg bg-amber-500/10 text-amber-400">
             <Printer className="w-4 h-4" />
           </div>
           <div>
@@ -151,7 +150,7 @@ export const Step8PreviewLocked: React.FC<Step8PreviewLockedProps> = ({
       </div>
 
       {/* Action Button */}
-      <div className="pt-2 border-t border-zinc-800">
+      <div className="shrink-0 pt-2 pb-1 border-t border-zinc-800">
         <button
           id="btn-proceed-to-checkout"
           disabled={isLoading || !watermarkedImg}

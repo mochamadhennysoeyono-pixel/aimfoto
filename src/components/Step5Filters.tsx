@@ -26,9 +26,9 @@ export const Step5Filters: React.FC<Step5FiltersProps> = ({
     FILTER_PRESETS.find((f) => f.id === selectedFilterId) || FILTER_PRESETS[0];
 
   return (
-    <div className="flex-1 flex flex-col justify-between max-w-md mx-auto w-full p-4 overflow-y-auto">
+    <div className="flex-1 flex flex-col justify-between max-w-lg mx-auto w-full p-3 sm:p-4 min-h-0 overflow-y-auto">
       {/* Header */}
-      <div>
+      <div className="shrink-0">
         <div className="flex items-center justify-between pb-2 border-b border-zinc-800">
           <button
             onClick={onBack}
@@ -43,11 +43,11 @@ export const Step5Filters: React.FC<Step5FiltersProps> = ({
           </span>
         </div>
 
-        <div className="text-center pt-3 pb-2">
+        <div className="text-center pt-2.5 pb-1.5">
           <p className="text-[11px] font-mono tracking-widest text-amber-400 uppercase mb-0.5">
             Step 5: Filter Warna
           </p>
-          <h2 className="text-lg font-bold text-white tracking-tight flex items-center justify-center gap-1.5">
+          <h2 className="text-base sm:text-lg font-bold text-white tracking-tight flex items-center justify-center gap-1.5">
             <Sparkles className="w-4 h-4 text-amber-400" />
             Pilih Sentuhan Warna
           </h2>
@@ -57,8 +57,8 @@ export const Step5Filters: React.FC<Step5FiltersProps> = ({
         </div>
       </div>
 
-      {/* Main Preview with Live CSS / Canvas Filter */}
-      <div className="relative w-full aspect-[4/5] max-h-[46vh] bg-zinc-950 rounded-2xl overflow-hidden border border-zinc-800 shadow-2xl flex items-center justify-center my-auto">
+      {/* Main Preview with Live CSS / Canvas Filter: Kotak 1:1 aspect-square */}
+      <div className="relative w-full aspect-square bg-zinc-950 rounded-2xl overflow-hidden border border-zinc-800 shadow-2xl flex items-center justify-center my-2 shrink-0">
         <div className="relative w-full h-full">
           {currentPhoto ? (
             <img
@@ -96,7 +96,7 @@ export const Step5Filters: React.FC<Step5FiltersProps> = ({
 
       {/* Multiple Photos Selector */}
       {allPhotos.length > 1 && (
-        <div className="flex items-center gap-2 py-1.5 overflow-x-auto scrollbar-none">
+        <div className="flex items-center gap-2 py-1.5 overflow-x-auto scrollbar-none shrink-0">
           <span className="text-[10px] font-mono text-zinc-400 shrink-0">Pilih Foto:</span>
           {allPhotos.map((p, idx) => (
             <button
@@ -115,7 +115,7 @@ export const Step5Filters: React.FC<Step5FiltersProps> = ({
       )}
 
       {/* Filter Presets Carousel */}
-      <div className="py-2">
+      <div className="py-2 shrink-0">
         <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
           {FILTER_PRESETS.map((preset) => {
             const isSelected = activePreset.id === preset.id;
@@ -164,7 +164,7 @@ export const Step5Filters: React.FC<Step5FiltersProps> = ({
       </div>
 
       {/* Bottom Actions */}
-      <div className="pt-2 border-t border-zinc-800 flex items-center gap-3">
+      <div className="pt-2 pb-1 border-t border-zinc-800 flex items-center gap-3 shrink-0">
         <button
           id="btn-confirm-filter"
           onClick={onNext}

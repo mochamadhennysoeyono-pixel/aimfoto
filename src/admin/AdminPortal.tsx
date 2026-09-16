@@ -18,9 +18,10 @@ import { AdminFrames } from './AdminFrames';
 import { AdminLayouts } from './AdminLayouts';
 import { AdminOrders } from './AdminOrders';
 import { AdminSetup } from './AdminSetup';
-import { LayoutGrid } from 'lucide-react';
+import { AdminPaymentFlip } from './AdminPaymentFlip';
+import { LayoutGrid, Wallet } from 'lucide-react';
 
-export type AdminTab = 'events' | 'frames' | 'layouts' | 'orders' | 'setup';
+export type AdminTab = 'events' | 'frames' | 'layouts' | 'orders' | 'setup' | 'payment';
 
 interface AdminPortalProps {
   onBackToKiosk: () => void;
@@ -39,6 +40,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   // Active admin tab determined from URL path or state
   const [activeTab, setActiveTab] = useState<AdminTab>(() => {
     const path = window.location.pathname.toLowerCase();
+    if (path.includes('/admin/payment') || path.includes('/admin/flip')) return 'payment';
     if (path.includes('/admin/layouts')) return 'layouts';
     if (path.includes('/admin/frames')) return 'frames';
     if (path.includes('/admin/orders')) return 'orders';
@@ -168,6 +170,18 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
           </button>
 
           <button
+            onClick={() => navigateToTab('payment')}
+            className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+              activeTab === 'payment'
+                ? 'bg-amber-500 text-zinc-950 font-bold shadow-md shadow-amber-500/20'
+                : 'text-zinc-400 hover:text-white hover:bg-zinc-900/80'
+            }`}
+          >
+            <Wallet className="w-4 h-4" />
+            <span>Integrasi Flip</span>
+          </button>
+
+          <button
             onClick={() => navigateToTab('setup')}
             className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
               activeTab === 'setup'
@@ -270,6 +284,16 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
           </button>
 
           <button
+            onClick={() => navigateToTab('payment')}
+            className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-semibold ${
+              activeTab === 'payment' ? 'bg-amber-500 text-zinc-950' : 'text-zinc-400'
+            }`}
+          >
+            <Wallet className="w-4 h-4" />
+            <span>Integrasi Flip</span>
+          </button>
+
+          <button
             onClick={() => navigateToTab('setup')}
             className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-semibold ${
               activeTab === 'setup' ? 'bg-amber-500 text-zinc-950' : 'text-zinc-400'
@@ -314,6 +338,8 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
         )}
 
         {activeTab === 'orders' && <AdminOrders />}
+
+        {activeTab === 'payment' && <AdminPaymentFlip />}
 
         {activeTab === 'setup' && <AdminSetup />}
       </main>
