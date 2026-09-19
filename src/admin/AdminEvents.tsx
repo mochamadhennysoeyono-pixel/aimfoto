@@ -141,12 +141,13 @@ export const AdminEvents: React.FC<AdminEventsProps> = ({
         ).map((ev) => {
           const meta = metaMap[ev.id] || {};
           const isFree = meta.isFreeEvent ?? (ev.default_price === 0);
+          const defaultPr = ev.default_price !== undefined && ev.default_price !== null ? Number(ev.default_price) : 10000;
           return {
             ...ev,
             lokasi: meta.lokasi || (ev as any).lokasi || '',
             is_free_event: isFree,
-            harga_digital: meta.hargaDigital !== undefined ? meta.hargaDigital : (isFree ? 0 : 10000),
-            harga_print: meta.hargaPrint !== undefined ? meta.hargaPrint : (isFree ? 0 : (ev.default_price || 25000)),
+            harga_digital: meta.hargaDigital !== undefined ? meta.hargaDigital : (isFree ? 0 : defaultPr),
+            harga_print: meta.hargaPrint !== undefined ? meta.hargaPrint : (isFree ? 0 : (defaultPr > 0 ? defaultPr : 25000)),
             promo_badge: meta.promoBadge || '',
             promo_description: meta.promoDescription || '',
           };
@@ -244,8 +245,8 @@ export const AdminEvents: React.FC<AdminEventsProps> = ({
           setErrorMsg(`Gagal menambah event: ${error.message}`);
         }
       } else {
-        const parsedDigital = formIsFreeEvent ? 0 : (parseInt(formHargaDigital, 10) || 0);
-        const parsedPrint = formIsFreeEvent ? 0 : (parseInt(formHargaPrint, 10) || 0);
+        const parsedDigital = formIsFreeEvent ? 0 : (parseInt(formHargaDigital, 10) || parsedPrice);
+        const parsedPrint = formIsFreeEvent ? 0 : (parseInt(formHargaPrint, 10) || parsedPrice);
 
         // Simpan metadata lokasi, tarif paket, dan promo
         await saveEventMetadata(newId, {
@@ -263,18 +264,37 @@ export const AdminEvents: React.FC<AdminEventsProps> = ({
             localStorage.setItem('photobooth_default_event_id', newId);
             setDefaultEventId(newId);
             // Simpan cache event utama
+            const fullConfig = {
+              id: newId,
+              nama: formName.trim(),
+              lokasi: formLokasi.trim() || 'Photobooth Station',
+              hargaPerFoto: parsedPrice,
+              isFreeEvent: formIsFreeEvent,
+              hargaDigital: parsedDigital,
+              hargaPrint: parsedPrint,
+              promoBadge: formPromoBadge.trim(),
+              promoDescription: formPromoDescription.trim(),
+            };
             localStorage.setItem(
               'photobooth_cached_event_config',
-              JSON.stringify({
-                id: newId,
-                nama: formName.trim(),
-                lokasi: formLokasi.trim() || 'Photobooth Station',
-                hargaPerFoto: parsedPrice,
-                isFreeEvent: formIsFreeEvent,
-                hargaDigital: parsedDigital,
-                hargaPrint: parsedPrint,
-                promoBadge: formPromoBadge.trim(),
-                promoDescription: formPromoDescription.trim(),
+              JSON.stringify(fullConfig)
+            );
+            window.dispatchEvent(
+              new CustomEvent('photobooth-event-config-updated', {
+                detail: fullConfig,
+              })
+            );
+            window.dispatchEvent(
+              new CustomEvent('photobooth_event_updated', {
+                detail: {
+                  id: newId,
+                  price: parsedPrice,
+                  name: formName.trim(),
+                  lokasi: formLokasi.trim() || 'Photobooth Station',
+                  hargaDigital: parsedDigital,
+                  hargaPrint: parsedPrint,
+                  isFreeEvent: formIsFreeEvent,
+                },
               })
             );
             // Coba un-default event lain di Supabase jika kolom is_default ada
@@ -561,19 +581,30 @@ export const AdminEvents: React.FC<AdminEventsProps> = ({
   const handleSetAsDefault = async (ev: AdminEventItem) => {
     try {
       const selectedPrice = ev.default_price !== undefined && ev.default_price !== null ? Number(ev.default_price) : 10000;
+      const isFree = Boolean(ev.is_free_event || selectedPrice === 0);
+      const digitalPrice = isFree ? 0 : (ev.harga_digital !== undefined && ev.harga_digital !== null ? Number(ev.harga_digital) : selectedPrice);
+      const printPrice = isFree ? 0 : (ev.harga_print !== undefined && ev.harga_print !== null ? Number(ev.harga_print) : (selectedPrice > 0 ? selectedPrice : 25000));
+
       localStorage.setItem('photobooth_default_event_id', ev.id);
       try {
+        const fullDefaultConfig = {
+          id: ev.id,
+          nama: ev.name,
+          subtitle: (ev as any).description || 'Simpan kenangan indah Anda di booth digital',
+          tanggal: (ev as any).date || '',
+          lokasi: ev.lokasi || (ev as any).location || 'AIM SPACE Studio',
+          hargaPerFoto: selectedPrice,
+          isFreeEvent: isFree,
+          hargaDigital: digitalPrice,
+          hargaPrint: printPrice,
+          promoBadge: ev.promo_badge || '',
+          promoDescription: ev.promo_description || '',
+          tipeEvent: (ev as any).event_type || '',
+        };
+
         localStorage.setItem(
           'photobooth_cached_event_config',
-          JSON.stringify({
-            id: ev.id,
-            nama: ev.name,
-            subtitle: (ev as any).description || 'Simpan kenangan indah Anda di booth digital',
-            tanggal: (ev as any).date || '',
-            lokasi: ev.lokasi || (ev as any).location || 'AIM SPACE Studio',
-            hargaPerFoto: selectedPrice,
-            tipeEvent: (ev as any).event_type || '',
-          })
+          JSON.stringify(fullDefaultConfig)
         );
         window.dispatchEvent(
           new CustomEvent('photobooth_event_updated', {
@@ -582,7 +613,15 @@ export const AdminEvents: React.FC<AdminEventsProps> = ({
               price: selectedPrice,
               name: ev.name,
               lokasi: ev.lokasi || 'AIM SPACE Studio',
+              hargaDigital: digitalPrice,
+              hargaPrint: printPrice,
+              isFreeEvent: isFree,
             },
+          })
+        );
+        window.dispatchEvent(
+          new CustomEvent('photobooth-event-config-updated', {
+            detail: fullDefaultConfig,
           })
         );
       } catch (e) {
@@ -1186,7 +1225,7 @@ export const AdminEvents: React.FC<AdminEventsProps> = ({
                               setEditLokasi(ev.lokasi || '');
                               setEditDefaultPrice(String(ev.default_price ?? 10000));
                               setEditIsFreeEvent(Boolean(ev.is_free_event || ev.default_price === 0));
-                              setEditHargaDigital(String(ev.harga_digital ?? 10000));
+                              setEditHargaDigital(String(ev.harga_digital ?? ev.default_price ?? 10000));
                               setEditHargaPrint(String(ev.harga_print ?? ev.default_price ?? 25000));
                               setEditPromoBadge(ev.promo_badge || '');
                               setEditPromoDescription(ev.promo_description || '');

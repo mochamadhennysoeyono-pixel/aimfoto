@@ -16,14 +16,42 @@ import {
   Printer,
   Tag,
   ShieldCheck,
+  Calendar,
+  Layers,
+  MapPin,
+  RefreshCw,
+  Loader2,
 } from 'lucide-react';
 import { getAdminWhatsapp, saveAdminWhatsapp } from '../services/adminContactService';
+import { supabase } from '../supabaseClient.js';
+import {
+  fetchEventsMetadata,
+  saveEventMetadata,
+  EventMetadata,
+} from '../services/eventMetaService';
 import { EventConfig } from '../types';
+
+interface SimpleEventItem {
+  id: string;
+  name: string;
+  default_price?: number;
+  is_default?: boolean;
+  is_active?: boolean;
+  lokasi?: string;
+}
 
 export const AdminPaymentWhatsapp: React.FC = () => {
   const [adminPhone, setAdminPhone] = useState<string>(getAdminWhatsapp());
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Daftar events & event yang sedang aktif dipilih
+  const [eventsList, setEventsList] = useState<SimpleEventItem[]>([]);
+  const [selectedEventId, setSelectedEventId] = useState<string>('');
+  const [selectedEvent, setSelectedEvent] = useState<SimpleEventItem | null>(null);
+  const [allMetaMap, setAllMetaMap] = useState<Record<string, EventMetadata>>({});
+  const [isLoadingEvents, setIsLoadingEvents] = useState(true);
 
   // Configuration state for flexible rumahan & event
   const [isFreeEvent, setIsFreeEvent] = useState(false);
@@ -39,54 +67,173 @@ export const AdminPaymentWhatsapp: React.FC = () => {
     'Serahkan uang tunai langsung ke kasir atau operator photobooth'
   );
 
-  useEffect(() => {
-    setAdminPhone(getAdminWhatsapp());
-
+  // Load events & sync with active event
+  const loadData = async () => {
+    setIsLoadingEvents(true);
     try {
-      const cached = localStorage.getItem('photobooth_cached_event_config');
-      if (cached) {
-        const parsed: Partial<EventConfig> = JSON.parse(cached);
-        if (parsed) {
-          setIsFreeEvent(
-            parsed.isFreeEvent === true ||
-              (parsed.hargaPerFoto === 0 && (parsed.hargaDigital ?? 0) === 0 && (parsed.hargaPrint ?? 0) === 0)
-          );
-          if (parsed.hargaDigital !== undefined) setHargaDigital(parsed.hargaDigital);
-          if (parsed.hargaPrint !== undefined) setHargaPrint(parsed.hargaPrint);
-          else if (parsed.hargaPerFoto) setHargaPrint(parsed.hargaPerFoto);
-          if (parsed.paymentMethodsAllowed) setPaymentMethodsAllowed(parsed.paymentMethodsAllowed);
-          if (parsed.packagesAllowed) setPackagesAllowed(parsed.packagesAllowed);
-          if (parsed.promoBadge) setPromoBadge(parsed.promoBadge);
-          if (parsed.promoDescription) setPromoDescription(parsed.promoDescription);
-          if (parsed.cashInstruction) setCashInstruction(parsed.cashInstruction);
+      setAdminPhone(getAdminWhatsapp());
+
+      // 1. Ambil daftar event dari Supabase
+      const { data: dbEvents } = await supabase
+        .from('events')
+        .select('id, name, default_price, is_default, is_active')
+        .order('created_at', { ascending: false });
+
+      const filteredEvents: SimpleEventItem[] = (dbEvents || []).filter(
+        (ev) => ev.name && !ev.name.startsWith('__') && ev.name !== 'ADMIN_CONFIG'
+      );
+      setEventsList(filteredEvents);
+
+      // 2. Ambil metadata map
+      const metaMap = await fetchEventsMetadata();
+      setAllMetaMap(metaMap);
+
+      // 3. Tentukan event aktif
+      const defaultIdInStorage = localStorage.getItem('photobooth_default_event_id');
+      let activeEv =
+        filteredEvents.find((e) => e.id === defaultIdInStorage) ||
+        filteredEvents.find((e) => e.is_default) ||
+        filteredEvents[0] ||
+        null;
+
+      if (activeEv) {
+        setSelectedEventId(activeEv.id);
+        setSelectedEvent(activeEv);
+        populateFieldsForEvent(activeEv, metaMap[activeEv.id]);
+      } else {
+        // Fallback ke cache jika Supabase offline
+        const cached = localStorage.getItem('photobooth_cached_event_config');
+        if (cached) {
+          try {
+            const parsed = JSON.parse(cached);
+            populateFieldsFromConfig(parsed);
+          } catch (_) {}
         }
       }
     } catch (e) {
-      console.warn('Error load cached event config in admin:', e);
+      console.warn('Error loading event data in AdminPaymentWhatsapp:', e);
+    } finally {
+      setIsLoadingEvents(false);
     }
+  };
+
+  useEffect(() => {
+    loadData();
   }, []);
 
-  const handleSaveAll = (e: React.FormEvent) => {
+  const populateFieldsForEvent = (ev: SimpleEventItem, meta?: EventMetadata) => {
+    const sessionPrice = ev.default_price !== undefined && ev.default_price !== null ? Number(ev.default_price) : 10000;
+    const isFree = meta?.isFreeEvent ?? (sessionPrice === 0);
+    setIsFreeEvent(isFree);
+
+    // Prioritaskan metadata spesifik event; jika belum diset khusus, gunakan sessionPrice event!
+    const effectiveDigital = isFree ? 0 : (meta?.hargaDigital !== undefined ? meta.hargaDigital : sessionPrice);
+    const effectivePrint = isFree ? 0 : (meta?.hargaPrint !== undefined ? meta.hargaPrint : (sessionPrice > 0 ? sessionPrice : 25000));
+
+    setHargaDigital(effectiveDigital);
+    setHargaPrint(effectivePrint);
+
+    if (meta?.paymentMethodsAllowed) setPaymentMethodsAllowed(meta.paymentMethodsAllowed);
+    else setPaymentMethodsAllowed('all');
+
+    if (meta?.packagesAllowed) setPackagesAllowed(meta.packagesAllowed);
+    else setPackagesAllowed('both');
+
+    if (meta?.promoBadge !== undefined) setPromoBadge(meta.promoBadge);
+    else setPromoBadge('Promo Spesial Studio');
+
+    if (meta?.promoDescription !== undefined) setPromoDescription(meta.promoDescription);
+    else setPromoDescription('Hasil foto tajam resolusi tinggi 300 DPI, pencahayaan optimal, & cetak instan!');
+
+    if (meta?.cashInstruction !== undefined) setCashInstruction(meta.cashInstruction);
+    else setCashInstruction('Serahkan uang tunai langsung ke kasir atau operator photobooth');
+  };
+
+  const populateFieldsFromConfig = (parsed: Partial<EventConfig>) => {
+    const isFree =
+      parsed.isFreeEvent === true ||
+      (parsed.hargaPerFoto === 0 && (parsed.hargaDigital ?? 0) === 0 && (parsed.hargaPrint ?? 0) === 0);
+    setIsFreeEvent(isFree);
+
+    if (parsed.hargaDigital !== undefined) setHargaDigital(parsed.hargaDigital);
+    else if (parsed.hargaPerFoto) setHargaDigital(parsed.hargaPerFoto);
+
+    if (parsed.hargaPrint !== undefined) setHargaPrint(parsed.hargaPrint);
+    else if (parsed.hargaPerFoto) setHargaPrint(parsed.hargaPerFoto);
+
+    if (parsed.paymentMethodsAllowed) setPaymentMethodsAllowed(parsed.paymentMethodsAllowed);
+    if (parsed.packagesAllowed) setPackagesAllowed(parsed.packagesAllowed);
+    if (parsed.promoBadge) setPromoBadge(parsed.promoBadge);
+    if (parsed.promoDescription) setPromoDescription(parsed.promoDescription);
+    if (parsed.cashInstruction) setCashInstruction(parsed.cashInstruction);
+  };
+
+  const handleSelectEvent = (eventId: string) => {
+    setSelectedEventId(eventId);
+    const found = eventsList.find((e) => e.id === eventId);
+    if (found) {
+      setSelectedEvent(found);
+      populateFieldsForEvent(found, allMetaMap[found.id]);
+    }
+  };
+
+  const handleSaveAll = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSaving(true);
 
-    // 1. Simpan nomor WA
-    saveAdminWhatsapp(adminPhone);
-    setAdminPhone(getAdminWhatsapp());
-
-    // 2. Simpan konfigurasi tarif & pembayaran ke localStorage
     try {
+      // 1. Simpan nomor WA
+      saveAdminWhatsapp(adminPhone);
+      setAdminPhone(getAdminWhatsapp());
+
+      const numDigital = isFreeEvent ? 0 : Number(hargaDigital) || 0;
+      const numPrint = isFreeEvent ? 0 : Number(hargaPrint) || 0;
+      const mainPrice = isFreeEvent ? 0 : (numPrint > 0 ? numPrint : (numDigital > 0 ? numDigital : 0));
+
+      const targetEventId = selectedEventId || localStorage.getItem('photobooth_default_event_id') || 'f1723176-eaa7-4c1d-bfc9-2c112677bb38';
+      const targetEventName = selectedEvent?.name || 'Photobooth Studio';
+
+      // 2. Simpan metadata ke Supabase (tersinkronisasi per-event ID)
+      await saveEventMetadata(targetEventId, {
+        isFreeEvent,
+        hargaDigital: numDigital,
+        hargaPrint: numPrint,
+        paymentMethodsAllowed,
+        packagesAllowed,
+        promoBadge: promoBadge.trim(),
+        promoDescription: promoDescription.trim(),
+        cashInstruction: cashInstruction.trim(),
+      });
+
+      // 3. Update default_price di database Supabase untuk event ini
+      if (selectedEventId) {
+        try {
+          await supabase
+            .from('events')
+            .update({ default_price: mainPrice })
+            .eq('id', selectedEventId);
+        } catch (dbErr) {
+          console.warn('Gagal update default_price di Supabase:', dbErr);
+        }
+      }
+
+      // 4. Update cache konfigurasi photobooth_cached_event_config
       let baseConfig: any = {};
       const cached = localStorage.getItem('photobooth_cached_event_config');
       if (cached) {
-        baseConfig = JSON.parse(cached);
+        try {
+          baseConfig = JSON.parse(cached);
+        } catch (_) {}
       }
 
       const updatedConfig: Partial<EventConfig> = {
         ...baseConfig,
+        id: targetEventId,
+        nama: targetEventName,
         isFreeEvent,
-        hargaDigital: isFreeEvent ? 0 : Number(hargaDigital) || 0,
-        hargaPrint: isFreeEvent ? 0 : Number(hargaPrint) || 0,
-        hargaPerFoto: isFreeEvent ? 0 : Number(hargaPrint) || 25000,
+        hargaDigital: numDigital,
+        hargaPrint: numPrint,
+        hargaPerFoto: mainPrice,
         paymentMethodsAllowed,
         packagesAllowed,
         promoBadge: promoBadge.trim(),
@@ -95,19 +242,57 @@ export const AdminPaymentWhatsapp: React.FC = () => {
       };
 
       localStorage.setItem('photobooth_cached_event_config', JSON.stringify(updatedConfig));
+      localStorage.setItem('photobooth_default_event_id', targetEventId);
 
-      // Beritahu Kiosk secara instan via event
+      // 5. Beritahu Kiosk secara instan via event
       window.dispatchEvent(
         new CustomEvent('photobooth-event-config-updated', {
           detail: updatedConfig,
         })
       );
-    } catch (err) {
-      console.warn('Gagal menyimpan config ke localStorage:', err);
-    }
+      window.dispatchEvent(
+        new CustomEvent('photobooth_event_updated', {
+          detail: {
+            id: targetEventId,
+            name: targetEventName,
+            price: mainPrice,
+            hargaDigital: numDigital,
+            hargaPrint: numPrint,
+            isFreeEvent,
+          },
+        })
+      );
 
-    setSavedSuccess(true);
-    setTimeout(() => setSavedSuccess(false), 3500);
+      // Update local memory map
+      setAllMetaMap((prev) => ({
+        ...prev,
+        [targetEventId]: {
+          ...(prev[targetEventId] || {}),
+          isFreeEvent,
+          hargaDigital: numDigital,
+          hargaPrint: numPrint,
+          paymentMethodsAllowed,
+          packagesAllowed,
+          promoBadge: promoBadge.trim(),
+          promoDescription: promoDescription.trim(),
+          cashInstruction: cashInstruction.trim(),
+        },
+      }));
+
+      // Update state event di list
+      setEventsList((prev) =>
+        prev.map((item) =>
+          item.id === targetEventId ? { ...item, default_price: mainPrice } : item
+        )
+      );
+
+      setSavedSuccess(true);
+      setTimeout(() => setSavedSuccess(false), 3500);
+    } catch (err) {
+      console.warn('Gagal menyimpan tarif:', err);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleCopy = (text: string) => {
@@ -118,7 +303,7 @@ export const AdminPaymentWhatsapp: React.FC = () => {
 
   const cleanPhone = adminPhone.replace(/[^0-9]/g, '');
   const formattedWaNumber = cleanPhone.startsWith('0') ? '62' + cleanPhone.slice(1) : cleanPhone;
-  const samplePrice = isFreeEvent ? 'GRATIS (Rp 0)' : `Rp ${Number(hargaPrint).toLocaleString('id-ID')}`;
+  const samplePrice = isFreeEvent ? 'GRATIS (Rp 0)' : `Rp ${Number(hargaPrint || hargaDigital).toLocaleString('id-ID')}`;
   const sampleMessage = `Halo Admin, saya ingin konfirmasi pembayaran photobooth sesi #SAMPLE-123 sebesar ${samplePrice}.`;
   const testWaUrl = `https://wa.me/${formattedWaNumber}?text=${encodeURIComponent(
     'Halo Admin! Ini adalah pesan uji coba dari sistem Photobooth AIM SPACE Studio.'
@@ -148,6 +333,45 @@ export const AdminPaymentWhatsapp: React.FC = () => {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Bar Sinkronisasi Event Aktif */}
+      <div className="p-4 sm:p-5 rounded-2xl bg-zinc-950 border border-amber-500/30 shadow-lg shadow-amber-500/5 flex flex-col sm:flex-row sm:items-center justify-between gap-3.5">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
+            <Calendar className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-white">
+                Tersinkronisasi dengan Event:
+              </span>
+              <span className="px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-[10px] font-mono font-bold">
+                {selectedEvent?.name || 'Event Aktif'}
+              </span>
+            </div>
+            <p className="text-[11px] text-zinc-400 mt-0.5">
+              Tarif & promo di bawah terhubung langsung dengan event ini. Perubahan harga di sini otomatis memperbarui kiosk & data transaksi tanpa tabrakan.
+            </p>
+          </div>
+        </div>
+
+        {eventsList.length > 1 && (
+          <div className="flex items-center gap-2 shrink-0">
+            <label className="text-[11px] text-zinc-400 whitespace-nowrap">Pilih Event:</label>
+            <select
+              value={selectedEventId}
+              onChange={(e) => handleSelectEvent(e.target.value)}
+              className="bg-zinc-900 border border-zinc-700 text-white text-xs rounded-xl px-3 py-2 font-medium focus:outline-none focus:border-amber-400 cursor-pointer"
+            >
+              {eventsList.map((ev) => (
+                <option key={ev.id} value={ev.id}>
+                  {ev.name} {ev.is_default ? '★ (Default)' : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       <form onSubmit={handleSaveAll} className="space-y-6">
@@ -515,10 +739,20 @@ export const AdminPaymentWhatsapp: React.FC = () => {
         <div className="flex justify-end pt-2">
           <button
             type="submit"
-            className="w-full sm:w-auto py-3.5 px-8 rounded-2xl bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 hover:from-amber-400 hover:to-amber-300 text-zinc-950 font-bold text-sm flex items-center justify-center gap-2 shadow-xl shadow-amber-500/25 transition-all cursor-pointer"
+            disabled={isSaving}
+            className="w-full sm:w-auto py-3.5 px-8 rounded-2xl bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 hover:from-amber-400 hover:to-amber-300 text-zinc-950 font-bold text-sm flex items-center justify-center gap-2 shadow-xl shadow-amber-500/25 transition-all cursor-pointer disabled:opacity-60"
           >
-            <Save className="w-4 h-4 stroke-[2.5]" />
-            <span>Simpan Semua Perubahan</span>
+            {isSaving ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin text-zinc-950" />
+                <span>Menyimpan ke Database & Kiosk...</span>
+              </>
+            ) : (
+              <>
+                <Save className="w-4 h-4 stroke-[2.5]" />
+                <span>Simpan Semua Perubahan</span>
+              </>
+            )}
           </button>
         </div>
       </form>

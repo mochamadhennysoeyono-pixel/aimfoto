@@ -181,11 +181,25 @@ export const Step10FinalSuccess: React.FC<Step10FinalSuccessProps> = ({
 
         if (isMounted && result.videoUrl) {
           setAnimatedFrameVideoUrl(result.videoUrl);
-          // Upload composited frame video to Supabase Storage
-          uploadBoomerangToStorage(session.id, result.videoUrl, 999)
+          // Upload composited 1-frame video to Supabase Storage as primary frame boomerang
+          uploadBoomerangToStorage(session.id, result.videoUrl, 'frame')
             .then((res) => {
               if (res.success && res.publicUrl && isMounted) {
                 setCloudBoomerangUrl(res.publicUrl);
+                try {
+                  const existingCache = JSON.parse(localStorage.getItem('photobooth_boomerang_sessions') || '{}');
+                  existingCache[session.id] = {
+                    ...(existingCache[session.id] || {}),
+                    orderId: order.id,
+                    hasBoomerang: true,
+                    frameVideoUrl: res.publicUrl,
+                    primaryVideoUrl: res.publicUrl,
+                    updatedAt: new Date().toISOString(),
+                  };
+                  localStorage.setItem('photobooth_boomerang_sessions', JSON.stringify(existingCache));
+                } catch (e) {
+                  console.warn('Cache local frame boomerang error:', e);
+                }
               }
             })
             .catch(console.warn);
@@ -260,16 +274,38 @@ export const Step10FinalSuccess: React.FC<Step10FinalSuccessProps> = ({
         setUploadStatus('success');
         setCloudPhotoUrl(res.publicUrl);
 
-        // Also upload primary Boomerang clip if available
-        const clipToUpload = currentBoomerangClip || boomerangClips[0];
-        if (clipToUpload) {
+        // Upload 1-Frame Boomerang Video jika sudah ada
+        if (animatedFrameVideoUrl) {
           try {
-            const bRes = await uploadBoomerangToStorage(session.id, clipToUpload, 0);
+            const bRes = await uploadBoomerangToStorage(session.id, animatedFrameVideoUrl, 'frame');
             if (bRes.success && bRes.publicUrl) {
               setCloudBoomerangUrl(bRes.publicUrl);
             }
           } catch (bErr) {
-            console.warn('Gagal upload boomerang softfile:', bErr);
+            console.warn('Gagal upload frame boomerang video:', bErr);
+          }
+        }
+
+        // Simpan ke cache lokal untuk akses langsung portal admin (fokus 1 frame video)
+        const effectiveFrameVideo = cloudBoomerangUrl || animatedFrameVideoUrl || currentBoomerangClip || '';
+        if (effectiveFrameVideo || session.boomerangEnabled) {
+          try {
+            const existingCache = JSON.parse(localStorage.getItem('photobooth_boomerang_sessions') || '{}');
+            existingCache[session.id] = {
+              orderId: order.id,
+              hasBoomerang: true,
+              slots: session.slotBoomerangConfig
+                ? Object.entries(session.slotBoomerangConfig)
+                    .filter(([_, active]) => active)
+                    .map(([idx]) => Number(idx) + 1)
+                : [1],
+              frameVideoUrl: effectiveFrameVideo,
+              primaryVideoUrl: effectiveFrameVideo,
+              updatedAt: new Date().toISOString(),
+            };
+            localStorage.setItem('photobooth_boomerang_sessions', JSON.stringify(existingCache));
+          } catch (cErr) {
+            console.warn('Cache local boomerang error:', cErr);
           }
         }
 

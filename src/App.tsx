@@ -376,8 +376,32 @@ export default function App() {
           if (raw) localCached = JSON.parse(raw);
         } catch (e) {}
 
+        const isSameEventCached = Boolean(localCached && localCached.id === eventData.id);
+
+        const isFree = isSameEventCached && localCached.isFreeEvent !== undefined
+          ? localCached.isFreeEvent
+          : (eventMeta.isFreeEvent ?? (sessionPrice === 0));
+
+        const finalHargaDigital = isFree
+          ? 0
+          : (eventMeta.hargaDigital !== undefined
+              ? eventMeta.hargaDigital
+              : (isSameEventCached && localCached.hargaDigital !== undefined
+                  ? localCached.hargaDigital
+                  : sessionPrice));
+
+        const finalHargaPrint = isFree
+          ? 0
+          : (eventMeta.hargaPrint !== undefined
+              ? eventMeta.hargaPrint
+              : (isSameEventCached && localCached.hargaPrint !== undefined
+                  ? localCached.hargaPrint
+                  : (sessionPrice > 0 ? sessionPrice : 25000)));
+
         const finalPackagesAllowed =
-          localCached.packagesAllowed || eventMeta.packagesAllowed || 'both';
+          (isSameEventCached && localCached.packagesAllowed) ||
+          eventMeta.packagesAllowed ||
+          'both';
 
         const config: EventConfig = {
           id: eventData.id,
@@ -386,14 +410,14 @@ export default function App() {
           tanggal: eventMeta.tanggal || eventData.tanggal || new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }),
           lokasi: dynamicLocation,
           hargaPerFoto: sessionPrice,
-          hargaDigital: localCached.hargaDigital ?? eventMeta.hargaDigital ?? 10000,
-          hargaPrint: localCached.hargaPrint ?? eventMeta.hargaPrint ?? (sessionPrice > 0 ? sessionPrice : 25000),
-          isFreeEvent: localCached.isFreeEvent ?? eventMeta.isFreeEvent ?? false,
-          paymentMethodsAllowed: localCached.paymentMethodsAllowed ?? eventMeta.paymentMethodsAllowed ?? 'all',
+          hargaDigital: finalHargaDigital,
+          hargaPrint: finalHargaPrint,
+          isFreeEvent: isFree,
+          paymentMethodsAllowed: (isSameEventCached && localCached.paymentMethodsAllowed) || eventMeta.paymentMethodsAllowed || 'all',
           packagesAllowed: finalPackagesAllowed,
-          promoBadge: localCached.promoBadge ?? eventMeta.promoBadge,
-          promoDescription: localCached.promoDescription ?? eventMeta.promoDescription,
-          cashInstruction: localCached.cashInstruction ?? eventMeta.cashInstruction,
+          promoBadge: (isSameEventCached && localCached.promoBadge) || eventMeta.promoBadge,
+          promoDescription: (isSameEventCached && localCached.promoDescription) || eventMeta.promoDescription,
+          cashInstruction: (isSameEventCached && localCached.cashInstruction) || eventMeta.cashInstruction,
           tipeEvent: eventData.tipe || 'Exhibition & Celebration',
         };
 
@@ -404,7 +428,10 @@ export default function App() {
         }
 
         setEventConfig(config);
-        setOrder((prev) => ({ ...prev, harga: sessionPrice }));
+        setOrder((prev) => ({
+          ...prev,
+          harga: selectedPackage === 'digital' ? finalHargaDigital : finalHargaPrint,
+        }));
         setSession((prev) => ({ ...prev, eventId: config.id }));
         localStorage.setItem('photobooth_cached_event_config', JSON.stringify(config));
       } else {
@@ -427,10 +454,19 @@ export default function App() {
     };
 
     const handleCustomEventUpdate = (e: any) => {
-      if (e?.detail?.price) {
+      if (e?.detail?.price !== undefined) {
         const newPrice = Number(e.detail.price);
         setEventConfig((prev) => ({ ...prev, hargaPerFoto: newPrice }));
         setOrder((prev) => ({ ...prev, harga: newPrice }));
+      }
+      if (e?.detail?.hargaDigital !== undefined) {
+        setEventConfig((prev) => ({ ...prev, hargaDigital: Number(e.detail.hargaDigital) }));
+      }
+      if (e?.detail?.hargaPrint !== undefined) {
+        setEventConfig((prev) => ({ ...prev, hargaPrint: Number(e.detail.hargaPrint) }));
+      }
+      if (e?.detail?.isFreeEvent !== undefined) {
+        setEventConfig((prev) => ({ ...prev, isFreeEvent: Boolean(e.detail.isFreeEvent) }));
       }
       if (e?.detail?.lokasi !== undefined) {
         setEventConfig((prev) => ({ ...prev, lokasi: e.detail.lokasi }));
@@ -441,9 +477,17 @@ export default function App() {
       loadSupabaseEvent();
     };
 
+    const handleEventConfigUpdate = (e: any) => {
+      if (e?.detail) {
+        setEventConfig((prev) => ({ ...prev, ...e.detail }));
+      }
+      loadSupabaseEvent();
+    };
+
     window.addEventListener('focus', handleFocus);
     window.addEventListener('storage', handleFocus);
     window.addEventListener('photobooth_event_updated', handleCustomEventUpdate);
+    window.addEventListener('photobooth-event-config-updated', handleEventConfigUpdate);
 
     let channel: any = null;
     try {
@@ -465,6 +509,7 @@ export default function App() {
       window.removeEventListener('focus', handleFocus);
       window.removeEventListener('storage', handleFocus);
       window.removeEventListener('photobooth_event_updated', handleCustomEventUpdate);
+      window.removeEventListener('photobooth-event-config-updated', handleEventConfigUpdate);
       if (channel) {
         supabase.removeChannel(channel);
       }
@@ -473,13 +518,30 @@ export default function App() {
 
   // Keep order price in sync with eventConfig
   useEffect(() => {
-    if (eventConfig.hargaPerFoto && order.statusPembayaran === 'pending') {
+    if (order.statusPembayaran === 'pending' && currentStep < 9) {
+      const isFree =
+        eventConfig.isFreeEvent === true ||
+        (eventConfig.hargaPerFoto === 0 &&
+          (eventConfig.hargaDigital ?? 0) === 0 &&
+          (eventConfig.hargaPrint ?? 0) === 0);
+
+      const pkg = order.selectedPackage || selectedPackage;
+      const effectivePrice = isFree
+        ? 0
+        : pkg === 'digital'
+        ? (eventConfig.hargaDigital !== undefined && eventConfig.hargaDigital !== null
+            ? eventConfig.hargaDigital
+            : (eventConfig.hargaPerFoto || 10000))
+        : (eventConfig.hargaPrint !== undefined && eventConfig.hargaPrint !== null
+            ? eventConfig.hargaPrint
+            : (eventConfig.hargaPerFoto || 25000));
+
       setOrder((prev) => ({
         ...prev,
-        harga: eventConfig.hargaPerFoto,
+        harga: effectivePrice,
       }));
     }
-  }, [eventConfig.hargaPerFoto, order.statusPembayaran]);
+  }, [eventConfig.hargaPerFoto, eventConfig.hargaDigital, eventConfig.hargaPrint, eventConfig.isFreeEvent, order.statusPembayaran, order.selectedPackage, selectedPackage, currentStep]);
 
   // Reset to initial clean state for next guest
   const handleResetSession = () => {
@@ -638,8 +700,12 @@ export default function App() {
     const price = isFree
       ? 0
       : chosenPackage === 'digital'
-      ? eventConfig.hargaDigital ?? 10000
-      : eventConfig.hargaPrint ?? eventConfig.hargaPerFoto ?? 25000;
+      ? (eventConfig.hargaDigital !== undefined && eventConfig.hargaDigital !== null
+          ? eventConfig.hargaDigital
+          : (eventConfig.hargaPerFoto || 10000))
+      : (eventConfig.hargaPrint !== undefined && eventConfig.hargaPrint !== null
+          ? eventConfig.hargaPrint
+          : (eventConfig.hargaPerFoto || 25000));
 
     const newOrder: PhotoboothOrder = {
       id: newOrderId,

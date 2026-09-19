@@ -20,6 +20,10 @@ import {
   X,
   Copy,
   Printer,
+  Film,
+  Sparkles,
+  Video,
+  Play,
 } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import { AdminEventItem } from './AdminEvents';
@@ -36,6 +40,7 @@ export interface AdminOrderItem {
   amount: number;
   payment_status: string;
   payment_method?: string;
+  payment_reference?: string;
   paid_at?: string;
   created_at: string;
   // Joined fields
@@ -43,6 +48,10 @@ export interface AdminOrderItem {
   eventId?: string;
   finalUrl?: string | null;
   previewUrl?: string | null;
+  // Boomerang fields (1-frame composited video)
+  hasBoomerang?: boolean;
+  boomerangSlots?: number[];
+  frameBoomerangUrl?: string | null;
 }
 
 export const AdminOrders: React.FC = () => {
@@ -62,6 +71,8 @@ export const AdminOrders: React.FC = () => {
   // Print & Download States
   const [printingOrderId, setPrintingOrderId] = useState<string | null>(null);
   const [downloadingOrderId, setDownloadingOrderId] = useState<string | null>(null);
+  const [downloadingBoomerangId, setDownloadingBoomerangId] = useState<string | null>(null);
+  const [copiedBoomerangId, setCopiedBoomerangId] = useState<string | null>(null);
   const [activePrintNotice, setActivePrintNotice] = useState<{
     orderShort: string;
     blobUrl: string;
@@ -127,6 +138,44 @@ export const AdminOrders: React.FC = () => {
     }
   };
 
+  // Handler Salin Link Boomerang
+  const handleCopyBoomerangUrl = async (orderId: string, url: string) => {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiedBoomerangId(orderId);
+      setTimeout(() => setCopiedBoomerangId(null), 2000);
+    } catch (e) {
+      console.warn('Gagal salin link Boomerang:', e);
+    }
+  };
+
+  // Handler Unduh Video Boomerang 1 Frame Utuh
+  const handleDownloadBoomerang = async (ord: AdminOrderItem) => {
+    const url = ord.frameBoomerangUrl;
+
+    if (!url) {
+      setSuccessNotice(`Video Boomerang 1 Frame untuk order #${ord.id.slice(0, 8)} sedang disinkronkan ke server.`);
+      setTimeout(() => setSuccessNotice(null), 4000);
+      return;
+    }
+
+    setDownloadingBoomerangId(ord.id);
+    const orderShort = ord.id.slice(0, 8).toUpperCase();
+    const eventSlug = ord.eventName?.replace(/[^a-zA-Z0-9]/g, '_') || 'event';
+    const ext = url.includes('.webm') ? 'webm' : 'mp4';
+    const filename = `photobooth-${eventSlug}-${orderShort}-frame-boomerang.${ext}`;
+
+    try {
+      await downloadPhotoFile(url, filename);
+      setSuccessNotice(`Video Boomerang (1 Frame Utuh) order #${orderShort} berhasil diunduh.`);
+      setTimeout(() => setSuccessNotice(null), 4000);
+    } catch (err) {
+      console.warn('Gagal unduh video frame boomerang:', err);
+    } finally {
+      setDownloadingBoomerangId(null);
+    }
+  };
+
   // Filters
   const [filterEventId, setFilterEventId] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
@@ -165,7 +214,71 @@ export const AdminOrders: React.FC = () => {
         });
       }
 
-      // 3. Fetch orders
+      // 3. Fetch file storage di bucket 'photos' folder 'sessions' untuk mendeteksi video boomerang 1-frame
+      const sessionBoomerangMap = new Map<string, { frameUrl?: string; fallbackUrl?: string; slots: number[] }>();
+      try {
+        const { data: storageFiles } = await supabase.storage
+          .from('photos')
+          .list('sessions', { limit: 1000 });
+
+        if (storageFiles && storageFiles.length > 0) {
+          storageFiles.forEach((file) => {
+            const isBoomerang = file.name.includes('_boomerang') || file.name.includes('frame_boomerang');
+            if (isBoomerang) {
+              let sessionId = '';
+              if (file.name.includes('_frame_boomerang')) {
+                sessionId = file.name.split('_frame_boomerang')[0];
+              } else if (file.name.includes('_boomerang')) {
+                sessionId = file.name.split('_boomerang')[0];
+              }
+
+              if (!sessionId) return;
+
+              const { data: pubData } = supabase.storage
+                .from('photos')
+                .getPublicUrl(`sessions/${file.name}`);
+              const publicUrl = pubData.publicUrl;
+
+              const entry = sessionBoomerangMap.get(sessionId) || { slots: [] };
+
+              // Cek apakah file ini adalah video 1-frame utuh
+              const is1Frame =
+                file.name.includes('frame') ||
+                file.name.includes('slot_1000') ||
+                !file.name.includes('_slot_');
+
+              if (is1Frame && !entry.frameUrl) {
+                entry.frameUrl = publicUrl;
+              }
+              if (!entry.fallbackUrl) {
+                entry.fallbackUrl = publicUrl;
+              }
+
+              const slotMatch = file.name.match(/_slot_(\d+)/i);
+              if (slotMatch && slotMatch[1]) {
+                const sNum = parseInt(slotMatch[1], 10);
+                if (sNum > 0 && sNum < 999 && !entry.slots.includes(sNum)) {
+                  entry.slots.push(sNum);
+                }
+              }
+
+              sessionBoomerangMap.set(sessionId, entry);
+            }
+          });
+        }
+      } catch (stErr) {
+        console.warn('Gagal list file storage sessions:', stErr);
+      }
+
+      // 4. Baca cache lokal photobooth_boomerang_sessions
+      let localBoomerangCache: Record<string, any> = {};
+      try {
+        localBoomerangCache = JSON.parse(localStorage.getItem('photobooth_boomerang_sessions') || '{}');
+      } catch (cErr) {
+        console.warn('Error membaca cache lokal boomerang:', cErr);
+      }
+
+      // 5. Fetch orders
       const { data: ordersData, error: ordersError } = await supabase
         .from('orders')
         .select('*')
@@ -180,18 +293,68 @@ export const AdminOrders: React.FC = () => {
           const sessionInfo = sessionMap.get(ord.session_id);
           const eventId = sessionInfo?.eventId || '';
           const eventName = eventMap.get(eventId) || (eventId ? `Event (${eventId.slice(0, 8)})` : 'Event Photobooth');
+
+          const paymentRef = ord.payment_reference || '';
+          const localCache = localBoomerangCache[ord.session_id] || (ord.id ? localBoomerangCache[ord.id] : null);
+          const storageEntry = sessionBoomerangMap.get(ord.session_id);
+
+          // Deteksi Boomerang:
+          // 1. Payment reference memuat [BOOMERANG...
+          // 2. Ada file storage video boomerang yang cocok dengan session_id
+          // 3. Cache lokal mencatat hasBoomerang
+          const isFromPaymentRef = paymentRef.toUpperCase().includes('BOOMERANG');
+          const isFromStorage = !!storageEntry;
+          const isFromCache = !!localCache?.hasBoomerang;
+
+          const hasBoomerang = isFromPaymentRef || isFromStorage || isFromCache;
+
+          // Ekstrak slot yang aktif
+          const slotNumbers: number[] = [];
+          if (isFromPaymentRef) {
+            const slotMatches = paymentRef.match(/Slot\s*([0-9,\s]+)/i);
+            if (slotMatches && slotMatches[1]) {
+              slotMatches[1].split(',').forEach((s: string) => {
+                const n = parseInt(s.trim(), 10);
+                if (!isNaN(n) && !slotNumbers.includes(n)) slotNumbers.push(n);
+              });
+            }
+          }
+          if (storageEntry && storageEntry.slots) {
+            storageEntry.slots.forEach((s) => {
+              if (!slotNumbers.includes(s)) slotNumbers.push(s);
+            });
+          }
+          if (isFromCache && Array.isArray(localCache.slots)) {
+            localCache.slots.forEach((s: number) => {
+              if (!slotNumbers.includes(s)) slotNumbers.push(s);
+            });
+          }
+
+          // Video Boomerang 1-Frame URL:
+          // Prioritaskan file 1-frame dari storage / cache lokal
+          const frameBoomerangUrl =
+            storageEntry?.frameUrl ||
+            localCache?.frameVideoUrl ||
+            storageEntry?.fallbackUrl ||
+            localCache?.primaryVideoUrl ||
+            null;
+
           return {
             id: ord.id,
             session_id: ord.session_id,
             amount: Number(ord.amount) || 0,
             payment_status: ord.payment_status || 'pending',
             payment_method: ord.payment_method || 'QRIS',
+            payment_reference: ord.payment_reference,
             paid_at: ord.paid_at,
             created_at: ord.created_at || ord.paid_at || new Date().toISOString(),
             eventId,
             eventName,
             finalUrl: sessionInfo?.finalUrl,
             previewUrl: sessionInfo?.previewUrl,
+            hasBoomerang,
+            boomerangSlots: slotNumbers.sort((a, b) => a - b),
+            frameBoomerangUrl,
           };
         });
 
@@ -659,7 +822,7 @@ export const AdminOrders: React.FC = () => {
                 <th className="py-3 px-4 font-mono">Jumlah Bayar</th>
                 <th className="py-3 px-4 text-center">Foto Cloud</th>
                 <th className="py-3 px-4 text-center">Status</th>
-                <th className="py-3 px-4 text-center min-w-[210px]">Aksi & Cetak</th>
+                <th className="py-3 px-4 text-center min-w-[320px]">Aksi & Cetak</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-800/80">
@@ -715,7 +878,7 @@ export const AdminOrders: React.FC = () => {
                         )}
                       </td>
 
-                      {/* Order ID */}
+                      {/* Order ID & Boomerang Tag */}
                       <td className="py-3 px-4 font-mono text-zinc-400 text-[11px]">
                         <span className="block text-zinc-300 truncate max-w-[140px]" title={ord.id}>
                           {ord.id}
@@ -723,6 +886,16 @@ export const AdminOrders: React.FC = () => {
                         <span className="text-[10px] text-zinc-600 block truncate max-w-[140px]" title={ord.session_id}>
                           sesi: {ord.session_id.slice(0, 8)}...
                         </span>
+                        {ord.hasBoomerang && (
+                          <div className="mt-1">
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-purple-500/15 border border-purple-500/30 text-[9px] font-mono text-purple-300 font-semibold shadow-sm">
+                              <Film className="w-2.5 h-2.5 text-purple-400" />
+                              <span>
+                                Boomerang {ord.boomerangSlots && ord.boomerangSlots.length > 0 ? `Slot ${ord.boomerangSlots.join(', ')}` : 'Aktif'}
+                              </span>
+                            </span>
+                          </div>
+                        )}
                       </td>
 
                       {/* Payment Method */}
@@ -737,39 +910,79 @@ export const AdminOrders: React.FC = () => {
                         {formatRupiah(ord.amount)}
                       </td>
 
-                      {/* Cloud Photo Link */}
+                      {/* Cloud Photo & Boomerang Links */}
                       <td className="py-3 px-4 text-center">
-                        {ord.finalUrl ? (
-                          <div className="inline-flex items-center justify-center gap-1.5">
-                            <a
-                              href={ord.finalUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-sky-500/15 border border-sky-500/30 text-sky-400 hover:bg-sky-500/25 text-[11px] font-medium transition-colors"
-                              title="Buka Foto HD di Supabase Storage"
-                            >
-                              <ImageIcon className="w-3.5 h-3.5" />
-                              <span>Foto HD</span>
-                              <ExternalLink className="w-3 h-3 opacity-70" />
-                            </a>
-                            <button
-                              type="button"
-                              onClick={() => handleCopyOrderUrl(ord.id, ord.finalUrl!)}
-                              className="p-1 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white border border-zinc-800 transition-colors"
-                              title="Salin Link Soft File untuk dikirim ke Tamu via WA"
-                            >
-                              {copiedOrderId === ord.id ? (
-                                <Check className="w-3.5 h-3.5 text-emerald-400" />
+                        <div className="flex flex-col items-center gap-1.5">
+                          {ord.finalUrl ? (
+                            <div className="inline-flex items-center justify-center gap-1.5">
+                              <a
+                                href={ord.finalUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-sky-500/15 border border-sky-500/30 text-sky-400 hover:bg-sky-500/25 text-[11px] font-medium transition-colors"
+                                title="Buka Foto HD di Supabase Storage"
+                              >
+                                <ImageIcon className="w-3.5 h-3.5" />
+                                <span>Foto HD</span>
+                                <ExternalLink className="w-3 h-3 opacity-70" />
+                              </a>
+                              <button
+                                type="button"
+                                onClick={() => handleCopyOrderUrl(ord.id, ord.finalUrl!)}
+                                className="p-1 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white border border-zinc-800 transition-colors cursor-pointer"
+                                title="Salin Link Soft File Foto HD untuk dikirim ke Tamu via WA"
+                              >
+                                {copiedOrderId === ord.id ? (
+                                  <Check className="w-3.5 h-3.5 text-emerald-400" />
+                                ) : (
+                                  <Copy className="w-3.5 h-3.5" />
+                                )}
+                              </button>
+                            </div>
+                          ) : ord.previewUrl ? (
+                            <span className="text-[10px] font-mono text-zinc-500">Draft Foto</span>
+                          ) : (
+                            <span className="text-zinc-600">-</span>
+                          )}
+
+                          {/* Link Video Boomerang jika order mengaktifkan Boomerang (1-Frame) */}
+                          {ord.hasBoomerang && (
+                            <div className="inline-flex items-center justify-center gap-1.5">
+                              {ord.frameBoomerangUrl ? (
+                                <a
+                                  href={ord.frameBoomerangUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-purple-500/15 border border-purple-500/30 text-purple-300 hover:bg-purple-500/25 text-[10px] font-medium transition-colors"
+                                  title="Buka Video Boomerang (1 Frame) di Browser"
+                                >
+                                  <Film className="w-3 h-3 text-purple-400" />
+                                  <span>Frame Boomerang</span>
+                                  <ExternalLink className="w-2.5 h-2.5 opacity-70" />
+                                </a>
                               ) : (
-                                <Copy className="w-3.5 h-3.5" />
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-purple-500/10 border border-purple-500/20 text-purple-400/80 text-[10px] font-mono">
+                                  <Sparkles className="w-2.5 h-2.5 text-purple-400" />
+                                  <span>Boomerang 1 Frame</span>
+                                </span>
                               )}
-                            </button>
-                          </div>
-                        ) : ord.previewUrl ? (
-                          <span className="text-[10px] font-mono text-zinc-500">Draft Foto</span>
-                        ) : (
-                          <span className="text-zinc-600">-</span>
-                        )}
+                              {ord.frameBoomerangUrl && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleCopyBoomerangUrl(ord.id, ord.frameBoomerangUrl!)}
+                                  className="p-1 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-purple-400 hover:text-white border border-zinc-800 transition-colors cursor-pointer"
+                                  title="Salin Link Video Frame Boomerang untuk dikirim ke Tamu via WA"
+                                >
+                                  {copiedBoomerangId === ord.id ? (
+                                    <Check className="w-3.5 h-3.5 text-emerald-400" />
+                                  ) : (
+                                    <Copy className="w-3.5 h-3.5" />
+                                  )}
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       </td>
 
                       {/* Status */}
@@ -787,9 +1000,27 @@ export const AdminOrders: React.FC = () => {
                         </span>
                       </td>
 
-                      {/* Aksi / Print / Download / Hapus */}
+                      {/* Aksi / Print / Download / Boomerang / Hapus */}
                       <td className="py-3 px-4 text-center whitespace-nowrap">
                         <div className="inline-flex items-center justify-center gap-1.5">
+                          {/* Tombol Unduh Boomerang (1 Frame Utuh) */}
+                          {ord.hasBoomerang && (
+                            <button
+                              type="button"
+                              onClick={() => handleDownloadBoomerang(ord)}
+                              disabled={downloadingBoomerangId === ord.id}
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-purple-500/15 hover:bg-purple-500/25 border border-purple-500/30 text-purple-300 hover:text-purple-200 text-xs font-semibold transition-all shadow-sm cursor-pointer disabled:opacity-40"
+                              title="Unduh video Boomerang dalam 1 Frame Utuh (.mp4/.webm)"
+                            >
+                              {downloadingBoomerangId === ord.id ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin text-purple-400" />
+                              ) : (
+                                <Film className="w-3.5 h-3.5 text-purple-400" />
+                              )}
+                              <span>Unduh Boomerang (1 Frame)</span>
+                            </button>
+                          )}
+
                           {/* Tombol Print Langsung Browser (10x15cm 4R) */}
                           <button
                             type="button"

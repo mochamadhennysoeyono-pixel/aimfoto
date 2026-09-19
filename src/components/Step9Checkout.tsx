@@ -31,7 +31,7 @@ import { generateWhatsAppPaymentMessage, buildWhatsAppUrl } from '../utils/whats
 import { supabase, HARDCODED_EVENT_ID } from '../supabaseClient';
 import { generateUuid } from '../utils/uuid';
 import { renderCompositedPhoto } from '../utils/canvasRenderer';
-import { uploadFinalPhotoToStorage } from '../services/storageService';
+import { uploadFinalPhotoToStorage, uploadBoomerangToStorage } from '../services/storageService';
 
 interface Step9CheckoutProps {
   session: PhotoboothSession;
@@ -99,7 +99,26 @@ export const Step9Checkout: React.FC<Step9CheckoutProps> = ({
 
   // Cek apakah paket cetak atau hanya digital
   const isPrint = order.selectedPackage === 'print' || session.selectedPackage === 'print';
+
+  // Deteksi secara akurat apakah ada slot foto yang mengaktifkan boomerang
+  const activeBoomerangSlots: number[] = [];
+  if (session.slotBoomerangConfig) {
+    Object.entries(session.slotBoomerangConfig).forEach(([slotIdx, isActive]) => {
+      if (isActive) {
+        activeBoomerangSlots.push(Number(slotIdx) + 1);
+      }
+    });
+  }
+  if (activeBoomerangSlots.length === 0 && session.boomerangClips && session.boomerangClips.length > 0) {
+    session.boomerangClips.forEach((clip, idx) => {
+      if (clip) {
+        activeBoomerangSlots.push(idx + 1);
+      }
+    });
+  }
+
   const hasBoomerang =
+    activeBoomerangSlots.length > 0 ||
     session.boomerangEnabled ||
     (session.boomerangClips && session.boomerangClips.length > 0) ||
     !!session.boomerangVideoUrl;
@@ -164,9 +183,14 @@ export const Step9Checkout: React.FC<Step9CheckoutProps> = ({
 
       await supabase.from('sessions').upsert([sessionPayload], { onConflict: 'id' });
 
-      // 2. Upsert order
+      // 2. Upsert order dengan metadata deteksi boomerang
       const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
       const validOrderId = order.id && uuidRegex.test(order.id) ? order.id : generateUuid();
+
+      const boomerangMetaTag = hasBoomerang
+        ? ` [BOOMERANG${activeBoomerangSlots.length > 0 ? `: Slot ${activeBoomerangSlots.join(', ')}` : ''}]`
+        : '';
+      const paymentRef = `${method.toUpperCase()}-${Date.now().toString().slice(-6)}${boomerangMetaTag}`;
 
       const orderPayload: any = {
         id: validOrderId,
@@ -174,11 +198,29 @@ export const Step9Checkout: React.FC<Step9CheckoutProps> = ({
         amount: order.harga,
         payment_status: status === 'success' ? 'success' : 'pending',
         payment_method: method,
-        payment_reference: `${method.toUpperCase()}-${Date.now().toString().slice(-6)}`,
+        payment_reference: paymentRef,
         paid_at: status === 'success' ? new Date().toISOString() : null,
       };
 
       await supabase.from('orders').upsert([orderPayload], { onConflict: 'id' });
+
+      // Simpan juga ke cache lokal agar langsung terdeteksi di portal admin
+      if (hasBoomerang) {
+        try {
+          const cachedBoomerang = JSON.parse(localStorage.getItem('photobooth_boomerang_sessions') || '{}');
+          cachedBoomerang[activeSessionId] = {
+            orderId: validOrderId,
+            hasBoomerang: true,
+            slots: activeBoomerangSlots,
+            primaryVideoUrl: session.boomerangVideoUrl || session.boomerangClips?.find(Boolean) || '',
+            slotBoomerangs: session.slotBoomerangs || {},
+            updatedAt: new Date().toISOString(),
+          };
+          localStorage.setItem('photobooth_boomerang_sessions', JSON.stringify(cachedBoomerang));
+        } catch (cacheErr) {
+          console.warn('Cache local boomerang error:', cacheErr);
+        }
+      }
 
       // 3. Render HD foto & upload ke Supabase Storage di background
       if (layout && filter) {
@@ -196,6 +238,31 @@ export const Step9Checkout: React.FC<Step9CheckoutProps> = ({
             uploadFinalPhotoToStorage(activeSessionId, rendered, session.frame_layout_id);
           })
           .catch((e) => console.warn('Render HD background error:', e));
+      }
+
+      // 4. Upload klip Boomerang ke Supabase Storage di background jika ada
+      if (hasBoomerang) {
+        if (session.slotBoomerangs && Object.keys(session.slotBoomerangs).length > 0) {
+          Object.entries(session.slotBoomerangs).forEach(([slotIdx, clip]) => {
+            if (clip) {
+              uploadBoomerangToStorage(activeSessionId, clip as string | Blob, Number(slotIdx)).catch((e) =>
+                console.warn(`Upload boomerang slot ${slotIdx} error:`, e)
+              );
+            }
+          });
+        } else if (session.boomerangClips && session.boomerangClips.length > 0) {
+          session.boomerangClips.forEach((clip, idx) => {
+            if (clip) {
+              uploadBoomerangToStorage(activeSessionId, clip as string | Blob, idx).catch((e) =>
+                console.warn(`Upload boomerang clip ${idx} error:`, e)
+              );
+            }
+          });
+        } else if (session.boomerangVideoUrl) {
+          uploadBoomerangToStorage(activeSessionId, session.boomerangVideoUrl, 0).catch((e) =>
+            console.warn('Upload primary boomerang error:', e)
+          );
+        }
       }
     } catch (err) {
       console.warn('Simpan data order ke database error:', err);

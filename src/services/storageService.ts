@@ -102,7 +102,7 @@ export async function uploadFinalPhotoToStorage(
 export async function uploadBoomerangToStorage(
   sessionId: string,
   videoUrlOrBlob: string | Blob,
-  slotIndex?: number
+  slotIndex?: number | 'frame'
 ): Promise<{ success: boolean; publicUrl?: string; error?: string }> {
   try {
     if (!videoUrlOrBlob) {
@@ -130,8 +130,10 @@ export async function uploadBoomerangToStorage(
     }
 
     const ext = contentType.includes('webm') ? 'webm' : 'mp4';
-    const suffix = slotIndex !== undefined ? `_slot_${slotIndex + 1}` : '';
-    const fileName = `sessions/${sessionId}_boomerang${suffix}.${ext}`;
+    const isFrameVideo = slotIndex === 'frame' || slotIndex === 999 || slotIndex === undefined;
+    const fileName = isFrameVideo
+      ? `sessions/${sessionId}_frame_boomerang.${ext}`
+      : `sessions/${sessionId}_boomerang_slot_${(slotIndex as number) + 1}.${ext}`;
 
     const { error: uploadError } = await supabase.storage
       .from('photos')
@@ -143,6 +145,20 @@ export async function uploadBoomerangToStorage(
     if (uploadError) {
       console.warn('Supabase boomerang upload error:', uploadError.message);
       return { success: false, error: uploadError.message };
+    }
+
+    // Jika ini adalah 1-frame video, simpan juga sebagai fallback utama sessions/${sessionId}_boomerang.${ext}
+    if (isFrameVideo) {
+      try {
+        await supabase.storage
+          .from('photos')
+          .upload(`sessions/${sessionId}_boomerang.${ext}`, blob, {
+            contentType,
+            upsert: true,
+          });
+      } catch (fErr) {
+        // Non-fatal fallback
+      }
     }
 
     const { data: publicUrlData } = supabase.storage
@@ -174,9 +190,29 @@ export async function deleteSessionPhotoFromStorage(
   try {
     const pathsToDelete: string[] = [];
 
-    // Path standar
+    // Path standar foto
     if (sessionId) {
       pathsToDelete.push(`sessions/${sessionId}.jpg`);
+
+      // Cari dan hapus juga file video boomerang sesi ini jika ada
+      try {
+        const { data: sessionFiles } = await supabase.storage
+          .from('photos')
+          .list('sessions', { search: sessionId });
+
+        if (sessionFiles && sessionFiles.length > 0) {
+          sessionFiles.forEach((file) => {
+            if (file.name.startsWith(sessionId)) {
+              const fullPath = `sessions/${file.name}`;
+              if (!pathsToDelete.includes(fullPath)) {
+                pathsToDelete.push(fullPath);
+              }
+            }
+          });
+        }
+      } catch (listErr) {
+        console.warn('Catatan list file sesi storage saat hapus:', listErr);
+      }
     }
 
     // Jika finalUrl mengandung path spesifik
