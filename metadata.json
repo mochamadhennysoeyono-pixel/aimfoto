@@ -1,6 +1,6 @@
 {
   "name": "Remix Photobooth Kiosk",
-  "description": "Aplikasi photobooth digital kiosk mobile-first untuk event dengan kamera langsung, filter real-time, overlay frame, preview watermark, checkout, dan cetak.",
+  "description": "Aplikasi photobooth digital kiosk mobile-first dengan sesi foto cetak & boomerang video soft file, filter real-time, overlay frame, preview watermark, checkout, dan cetak.",
   "requestFramePermissions": [
     "camera"
   ],

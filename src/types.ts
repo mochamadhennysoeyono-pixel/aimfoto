@@ -4,7 +4,7 @@
 
 export type SessionStatus = 'draft' | 'preview' | 'paid';
 
-export type PaymentStatus = 'pending' | 'settlement' | 'failed';
+export type PaymentStatus = 'pending' | 'settlement' | 'success' | 'failed';
 
 export type FrameLayoutType =
   | 'strip-3'       // 3 foto vertikal (Korean Photostrip)
@@ -96,12 +96,22 @@ export interface CustomDecorationItem {
   rotation?: number; // Derajat rotasi (-180 sampai 180)
 }
 
+export interface SlotAdjustment {
+  panX: number; // offset X in percentage (-80% to +80%, 0 is centered)
+  panY: number; // offset Y in percentage (-80% to +80%, 0 is centered)
+  zoom: number; // zoom scale factor (0.8 to 3.0, default 1.0)
+  rotation?: number; // optional rotation in degrees
+}
+
+export type SlotAdjustmentsMap = { [slotIndex: number]: SlotAdjustment };
+
 export interface PhotoboothSession {
   id: string;
   timestamp: string; // ISO string
   fotoOriginal: string; // Fallback / primary photo
   capturedPhotos: string[]; // Captured photos (exact photo_count)
   slotAssignments: { [slotIndex: number]: string }; // Map slotIndex -> photo data URL
+  slotAdjustments?: SlotAdjustmentsMap; // Pergeseran (pan X/Y) & Zoom per slot foto
   filterDipilih: string; // e.g. 'vintage', 'noir', 'normal'
   frameDipilih?: string; // Frame theme ID
   frame_layout_id?: string; // Specific combination row in frame_layouts table
@@ -114,6 +124,13 @@ export interface PhotoboothSession {
   watermarkedPhoto?: string;
   finalPhoto?: string;
   decorations?: CustomDecorationItem[]; // Custom teks dan emoji stiker yang ditambahkan pengguna
+  selectedPackage?: 'digital' | 'print'; // Paket yang dipilih pengguna
+  boomerangEnabled?: boolean; // Apakah sesi ini merekam klip boomerang
+  slotBoomerangConfig?: { [slotIndex: number]: boolean }; // Status aktif/nonaktif Boomerang per slot foto
+  boomerangClips?: string[]; // Video URL / Data URL Boomerang per-slot
+  slotBoomerangs?: { [slotIndex: number]: string }; // Map slotIndex -> video URL boomerang
+  boomerangVideoUrl?: string; // Video Boomerang utama / gabungan untuk softfile
+  animatedFrameVideoUrl?: string; // Video komposit seluruh frame dengan slot bergerak
 }
 
 export interface FrameLayoutVariant {
@@ -145,8 +162,9 @@ export interface PhotoboothOrder {
   harga: number; // e.g. 20000 (IDR)
   statusPembayaran: PaymentStatus;
   waktuCheckout: string; // ISO string
-  paymentMethod?: string; // e.g. 'QRIS', 'GoPay', 'BCA Virtual Account'
-  transactionId?: string; // Reference id from Midtrans / Xendit
+  paymentMethod?: string; // e.g. 'Tunai (Kasir)', 'QRIS', 'Gratis Event'
+  transactionId?: string; // Reference id from Midtrans / Xendit / Cash
+  selectedPackage?: 'digital' | 'print';
 }
 
 export interface FilterPreset {
@@ -162,6 +180,11 @@ export interface FilterPreset {
   grayscale: number; // 0 to 1
   hueRotate: number; // degrees
   tint?: { r: number; g: number; b: number; alpha: number };
+  vignette?: {
+    intensity: number;    // Darkness factor at outer edges (0.0 to 1.0)
+    innerRadius?: number; // Fraction where center light is 100% clear (e.g. 0.25 to 0.35)
+    outerRadius?: number; // Fraction where darkness peaks (e.g. 0.85 to 0.98)
+  };
 }
 
 export interface EventConfig {
@@ -170,8 +193,17 @@ export interface EventConfig {
   subtitle: string;
   tanggal: string;
   lokasi: string;
-  hargaPerFoto: number; // default Rp 20.000
+  hargaPerFoto: number; // default / fallback (misal Rp 20.000)
+  hargaDigital?: number; // Harga paket softfile digital (misal Rp 10.000 atau Rp 0)
+  hargaPrint?: number; // Harga paket cetak fisik + digital (misal Rp 25.000 atau Rp 0)
+  isFreeEvent?: boolean; // Jika true / harga 0, lewati pembayaran (Gratis)
+  promoBadge?: string; // Teks badge promo, misal: "Promo Opening Studio"
+  promoDescription?: string; // Keterangan promo
+  paymentMethodsAllowed?: 'all' | 'cash' | 'digital'; // 'all' (Tunai & Digital), 'cash' (Tunai Saja), 'digital' (QRIS Saja)
+  packagesAllowed?: 'both' | 'digital_only' | 'print_only'; // 'both' (Tampilkan Keduanya), 'digital_only' (Hanya Paket Digital), 'print_only' (Hanya Paket Cetak Fisik)
+  cashInstruction?: string; // Petunjuk bayar tunai
   tipeEvent: 'Wedding' | 'Birthday' | 'Corporate' | 'Party' | string;
+  boomerangEnabled?: boolean; // Aktifkan sesi Boomerang di samping foto cetak
 }
 
 export type StepKey =

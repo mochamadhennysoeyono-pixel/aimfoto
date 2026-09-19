@@ -520,7 +520,25 @@ export const AdminFrames: React.FC<AdminFramesProps> = ({ initialSelectedEventId
     if (!themeToDelete) return;
     setIsDeletingTheme(true);
     try {
-      // 1. Delete linked frame_layouts first
+      // 0. Detach from sessions if any historical session references this theme or its layouts
+      const { data: linkedVariants } = await supabase
+        .from('frame_layouts')
+        .select('id')
+        .eq('frame_id', themeToDelete.id);
+      
+      const variantIds = (linkedVariants || []).map((v) => v.id);
+      if (variantIds.length > 0) {
+        await supabase
+          .from('sessions')
+          .update({ frame_layout_id: null })
+          .in('frame_layout_id', variantIds);
+      }
+      await supabase
+        .from('sessions')
+        .update({ frame_id: null })
+        .eq('frame_id', themeToDelete.id);
+
+      // 1. Delete linked frame_layouts
       await supabase.from('frame_layouts').delete().eq('frame_id', themeToDelete.id);
 
       // 2. Delete frame theme
@@ -635,6 +653,12 @@ export const AdminFrames: React.FC<AdminFramesProps> = ({ initialSelectedEventId
     if (!comboToDelete || !selectedThemeForLayouts) return;
     setIsDeletingCombo(true);
     try {
+      // Detach from any historical test sessions first
+      await supabase
+        .from('sessions')
+        .update({ frame_layout_id: null })
+        .eq('frame_layout_id', comboToDelete.id);
+
       const { error } = await supabase
         .from('frame_layouts')
         .delete()
@@ -854,7 +878,7 @@ export const AdminFrames: React.FC<AdminFramesProps> = ({ initialSelectedEventId
                           }}
                           className="bg-zinc-800 border border-zinc-600 flex items-center justify-center text-[8px] font-mono text-zinc-400"
                         >
-                          Slot #{slot.index ?? i + 1}
+                          Slot #{i + 1}
                         </div>
                       ))}
                       {/* PNG Overlay */}
@@ -953,7 +977,7 @@ export const AdminFrames: React.FC<AdminFramesProps> = ({ initialSelectedEventId
                               }}
                               className="bg-zinc-800 border border-zinc-700/60 flex items-center justify-center text-[7px] font-mono text-zinc-500"
                             >
-                              #{s.index ?? i + 1}
+                              #{i + 1}
                             </div>
                           ))}
                           <img
@@ -1330,7 +1354,7 @@ export const AdminFrames: React.FC<AdminFramesProps> = ({ initialSelectedEventId
                                     }}
                                     className="bg-zinc-800/90 border border-zinc-600/60 flex items-center justify-center text-[7px] font-mono text-zinc-400 font-bold"
                                   >
-                                    #{slot.index ?? i + 1}
+                                    #{i + 1}
                                   </div>
                                 ))}
 

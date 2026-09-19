@@ -10,10 +10,10 @@ import {
   Clock,
   CheckCircle2,
   AlertCircle,
-  ExternalLink,
-  ChevronRight,
-  ArrowLeft,
+  MessageSquare,
+  ArrowRight,
 } from 'lucide-react';
+import { getAdminWhatsapp } from '../services/adminContactService';
 
 export type LegalTab = 'terms' | 'refund' | 'contact' | 'privacy';
 
@@ -29,6 +29,18 @@ export const LegalInfoModal: React.FC<LegalInfoModalProps> = ({
   onClose,
 }) => {
   const [activeTab, setActiveTab] = useState<LegalTab>(initialTab);
+  const adminPhone = getAdminWhatsapp();
+
+  // Format admin phone number for display
+  const formattedAdminPhone = adminPhone.startsWith('62')
+    ? '+' + adminPhone
+    : adminPhone.startsWith('0')
+    ? '+62 ' + adminPhone.slice(1)
+    : adminPhone;
+
+  const waContactUrl = `https://wa.me/${adminPhone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(
+    'Halo Admin AimBoth, saya ingin bertanya seputar layanan photobooth / status sesi foto saya.'
+  )}`;
 
   // Sync initial tab when changed
   React.useEffect(() => {
@@ -48,7 +60,7 @@ export const LegalInfoModal: React.FC<LegalInfoModalProps> = ({
             </div>
             <div>
               <h2 className="text-base font-bold text-white tracking-wide">
-                Informasi Resmi & Legalitas
+                Informasi Resmi & Kebijakan Layanan
               </h2>
               <p className="text-xs text-zinc-400 font-mono">
                 AimBoth • photobooth.aimspace.my.id
@@ -92,18 +104,6 @@ export const LegalInfoModal: React.FC<LegalInfoModalProps> = ({
           </button>
 
           <button
-            onClick={() => setActiveTab('contact')}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg whitespace-nowrap transition-colors cursor-pointer ${
-              activeTab === 'contact'
-                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 font-semibold'
-                : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60'
-            }`}
-          >
-            <Phone className="w-3.5 h-3.5" />
-            <span>Hubungi Kami</span>
-          </button>
-
-          <button
             onClick={() => setActiveTab('privacy')}
             className={`flex items-center gap-2 px-3 py-1.5 rounded-lg whitespace-nowrap transition-colors cursor-pointer ${
               activeTab === 'privacy'
@@ -113,6 +113,18 @@ export const LegalInfoModal: React.FC<LegalInfoModalProps> = ({
           >
             <Shield className="w-3.5 h-3.5" />
             <span>Kebijakan Privasi</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('contact')}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg whitespace-nowrap transition-colors cursor-pointer ${
+              activeTab === 'contact'
+                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 font-semibold'
+                : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60'
+            }`}
+          >
+            <Phone className="w-3.5 h-3.5" />
+            <span>Hubungi Kami</span>
           </button>
         </div>
 
@@ -145,11 +157,22 @@ export const LegalInfoModal: React.FC<LegalInfoModalProps> = ({
                 <div>
                   <h4 className="font-semibold text-white text-sm mb-1.5 flex items-center gap-1.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-                    2. Deskripsi Layanan
+                    2. Deskripsi Layanan & Pilihan Paket
                   </h4>
-                  <p className="text-zinc-400">
-                    AimBoth menyediakan layanan photobooth mandiri (self-service) terintegrasi yang mencakup pengambilan foto interaktif melalui webcam/kamera, penerapan filter warna real-time, pemasangan bingkai tematik (frame overlay), preview foto, cetak foto instan, serta penyediaan unduhan digital beresolusi tinggi via QR Code.
+                  <p className="text-zinc-400 mb-2">
+                    AimBoth menyediakan sistem photobooth interaktif mandiri (self-service) yang mencakup pengambilan pose foto, filter warna real-time, pemasangan bingkai tematik (frame overlay), stiker dekorasi, dan preview hasil foto. Layanan tersedia dalam opsi paket:
                   </p>
+                  <ul className="list-disc list-inside space-y-1.5 text-zinc-400 ml-1">
+                    <li>
+                      <strong className="text-zinc-200">Paket Digital Softfile HD:</strong> Layanan sesi foto di mana file digital beresolusi tinggi (300 DPI) asli tanpa watermark beserta video boomerang dikirimkan langsung oleh admin resmi ke nomor WhatsApp pengguna setelah transaksi terverifikasi. Paket ini tidak mencakup cetak fisik.
+                    </li>
+                    <li>
+                      <strong className="text-zinc-200">Paket Cetak Fisik + Softfile HD:</strong> Layanan komplit yang mencakup pencetakan lembar photo strip fisik tebal glossy di lokasi booth serta bonus pengiriman seluruh softfile digital asli HD via WhatsApp oleh admin.
+                    </li>
+                    <li>
+                      <strong className="text-zinc-200">Sesi Bersponsor / Gratis:</strong> Pada event yang disewa penuh atau disponsori pihak penyelenggara, seluruh layanan dapat dinikmati secara gratis (Rp 0) tanpa biaya tambahan kepada tamu.
+                    </li>
+                  </ul>
                 </div>
 
                 <div>
@@ -158,29 +181,29 @@ export const LegalInfoModal: React.FC<LegalInfoModalProps> = ({
                     3. Kebijakan Transaksi & Pembayaran
                   </h4>
                   <ul className="list-disc list-inside space-y-1 text-zinc-400 ml-1">
-                    <li>Semua transaksi dilakukan dalam mata uang Rupiah (IDR).</li>
-                    <li>Pembayaran diproses secara aman melalui mitra gerbang pembayaran (Payment Gateway) resmi berizin Bank Indonesia (Flip / QRIS / Transfer Bank).</li>
-                    <li>Layanan pencetakan dan pelepasan watermark foto digital hanya akan aktif setelah status pembayaran berhasil terverifikasi oleh sistem secara otomatis.</li>
+                    <li>Semua transaksi dinyatakan dalam mata uang Rupiah (IDR).</li>
+                    <li>Metode pembayaran yang didukung meliputi pembayaran <strong className="text-zinc-200">Tunai</strong> langsung di meja kasir photobooth dan pembayaran non-tunai melalui <strong className="text-zinc-200">QRIS</strong> (GoPay, OVO, Dana, BCA, Mandiri Livin, ShopeePay, LinkAja, dll).</li>
+                    <li>Proses cetak lembar fisik dan pengiriman softfile digital HD melalui WhatsApp akan diproses oleh tim kasir/admin setelah pembayaran terkonfirmasi lunas.</li>
                   </ul>
                 </div>
 
                 <div>
                   <h4 className="font-semibold text-white text-sm mb-1.5 flex items-center gap-1.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-                    4. Hak Kekayaan Intelektual & Privasi Foto
+                    4. Hak Cipta & Pengiriman File via WhatsApp
                   </h4>
                   <p className="text-zinc-400">
-                    Pengguna memegang hak cipta penuh atas gambar pribadi yang diambil. AimBoth tidak akan pernah menjual, menyebarluaskan, atau memanfaatkan foto pengguna untuk materi iklan publik tanpa persetujuan eksplisit. Foto disimpan pada server cloud terenkripsi khusus untuk akses unduhan oleh pemilik sesi.
+                    Pengguna memegang hak cipta penuh atas foto pribadi yang diambil. AimBoth menjamin tidak akan menyebarluaskan atau memperjualbelikan foto pengguna kepada pihak ketiga. Nomor WhatsApp yang digunakan oleh pelanggan saat menghubungi admin semata-mata dimanfaatkan untuk mentransfer file foto/video hasil sesi dan bukti transaksi.
                   </p>
                 </div>
 
                 <div>
                   <h4 className="font-semibold text-white text-sm mb-1.5 flex items-center gap-1.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-                    5. Batasan Tanggung Jawab
+                    5. Tata Tertib Penggunaan Kiosk
                   </h4>
                   <p className="text-zinc-400">
-                    Pengguna dilarang mengambil atau mencetak foto yang mengandung unsur pornografi, kekerasan ekstrim, ujaran kebencian, atau hal-hal yang melanggar ketentuan perundang-undangan Republik Indonesia. AimBoth berhak menghentikan sesi yang melanggar norma hukum.
+                    Pengguna dilarang berpose atau memasukkan konten yang melanggar hukum, norma kesusilaan (pornografi), kekerasan, atau ujaran kebencian. Operator booth berhak menolak mencetak atau meneruskan konten yang melanggar peraturan perundang-undangan Republik Indonesia.
                   </p>
                 </div>
               </div>
@@ -196,7 +219,7 @@ export const LegalInfoModal: React.FC<LegalInfoModalProps> = ({
                   Kebijakan Pengembalian Dana (Refund & Cancellation Policy)
                 </h3>
                 <p className="text-xs text-zinc-400 mt-1">
-                  Komitmen jaminan kualitas dan kepuasan pelanggan AimBoth
+                  Jaminan kepuasan pelanggan dan transparansi layanan AimBoth
                 </p>
               </div>
 
@@ -208,7 +231,7 @@ export const LegalInfoModal: React.FC<LegalInfoModalProps> = ({
                       Garansi Uang Kembali 100% Jika Terjadi Kendala Teknis
                     </span>
                     <span className="text-xs text-zinc-300">
-                      Kami menjamin pengembalian dana penuh tanpa potongan jika Anda mengalami kegagalan teknis pada sistem kami.
+                      Kami menjamin pengembalian dana penuh tanpa potongan apabila terjadi kegagalan sistem teknis pada kiosk atau pengiriman file kami.
                     </span>
                   </div>
                 </div>
@@ -220,16 +243,16 @@ export const LegalInfoModal: React.FC<LegalInfoModalProps> = ({
                   </h4>
                   <ul className="list-disc list-inside space-y-1.5 text-zinc-400 ml-1">
                     <li>
-                      <strong className="text-zinc-200">Gagal Cetak Fisik:</strong> Pembayaran telah sukses terpotong namun printer mengalami kehabisan kertas, paper jam, atau malfungsi hardware sehingga foto fisik tidak keluar.
+                      <strong className="text-zinc-200">Gagal Cetak Fisik (Paket Cetak):</strong> Pembayaran telah lunas namun mesin cetak mengalami kerusakan teknis (kertas habis, paper jam, tinta rusak) dan operator tidak dapat mencetak ulang foto fisik Anda di lokasi. Pengguna berhak meminta pengembalian penuh atau penyesuaian tarif menjadi Paket Digital.
                     </li>
                     <li>
-                      <strong className="text-zinc-200">Gagal Generate Unduhan Digital:</strong> Sistem gagal memproses foto resolusi tinggi atau link unduhan QR Code tidak dapat dibuka/rusak.
+                      <strong className="text-zinc-200">Gagal Pengiriman Softfile Digital:</strong> Terjadi kendala teknis pada sistem penyimpanan atau jaringan sehingga admin tidak dapat mengirimkan file digital HD Anda via WhatsApp dalam waktu wajar setelah sesi selesai.
                     </li>
                     <li>
-                      <strong className="text-zinc-200">Pembayaran Ganda (Double Charge):</strong> Saldo Anda terpotong lebih dari satu kali untuk satu kode sesi transaksi yang sama akibat latensi jaringan perbankan.
+                      <strong className="text-zinc-200">Pembayaran Ganda (Double Charge):</strong> Saldo Anda terpotong lebih dari satu kali untuk nomor tiket sesi yang sama akibat gangguan jaringan perbankan/QRIS.
                     </li>
                     <li>
-                      <strong className="text-zinc-200">Sistem Mati/Crash:</strong> Kiosk mati atau listrik padam sebelum proses output foto terselesaikan.
+                      <strong className="text-zinc-200">Sistem Mati / Listrik Padam:</strong> Kiosk mati mendadak sebelum proses pemotretan atau pemrosesan hasil foto terselesaikan.
                     </li>
                   </ul>
                 </div>
@@ -240,28 +263,35 @@ export const LegalInfoModal: React.FC<LegalInfoModalProps> = ({
                     2. Kondisi yang Tidak Dapat Dikembalikan (Non-Refundable):
                   </h4>
                   <ul className="list-disc list-inside space-y-1.5 text-zinc-400 ml-1">
-                    <li>Foto telah berhasil dicetak dengan kualitas normal dan/atau link unduhan digital telah berhasil diakses.</li>
-                    <li>Kesalahan pose, ekspresi wajah, atau salah memilih tema/layout yang dilakukan sendiri oleh pengguna setelah tombol konfirmasi ditekan.</li>
-                    <li>Pembatalan sepihak oleh pengguna setelah foto berhasil diproses dan dicetak.</li>
+                    <li>Foto fisik telah berhasil dicetak dengan baik dan/atau softfile HD telah berhasil dikirimkan ke WhatsApp pengguna.</li>
+                    <li>Ketidakpuasan pose pribadi, ekspresi wajah, atau salah memilih desain bingkai/filter yang ditentukan secara mandiri oleh pengguna selama sesi.</li>
+                    <li>Pembatalan sepihak setelah foto diproses atau dicetak oleh mesin.</li>
+                    <li>Kesalahan penulisan nomor WhatsApp oleh pengguna (namun admin akan dengan senang hati mengirimkan ulang ke nomor yang benar begitu pengguna mengonfirmasi).</li>
                   </ul>
                 </div>
 
                 <div>
                   <h4 className="font-semibold text-white text-sm mb-1.5 flex items-center gap-1.5">
                     <Clock className="w-4 h-4 text-amber-400" />
-                    3. Prosedur & Durasi Proses Refund:
+                    3. Alur & Prosedur Klaim Pengembalian Dana:
                   </h4>
                   <div className="bg-zinc-900/70 p-3.5 rounded-xl border border-zinc-800 space-y-2 text-zinc-300">
                     <p>
-                      Untuk mengajukan klaim pengembalian dana, kirimkan email ke: <strong className="text-amber-400">mochamadhennysoeyono@gmail.com</strong> dengan menyertakan:
+                      Klaim pengembalian dana dapat dilakukan secara mudah melalui salah satu cara berikut:
                     </p>
-                    <ol className="list-decimal list-inside space-y-1 text-xs text-zinc-400 ml-1">
-                      <li>Nomor Order ID / Bukti Transaksi QRIS/Transfer</li>
-                      <li>Foto kendala (misal: tampilan layar error atau printer tidak mencetak)</li>
-                      <li>Nomor Rekening atau nomor e-wallet tujuan pengembalian dana</li>
-                    </ol>
+                    <ul className="list-disc list-inside space-y-1 text-xs text-zinc-400 ml-1">
+                      <li>
+                        <strong className="text-zinc-200">Langsung di Kasir Booth:</strong> Sampaikan kendala kepada kasir/operator booth yang bertugas untuk pengembalian dana tunai seketika di lokasi.
+                      </li>
+                      <li>
+                        <strong className="text-zinc-200">Via WhatsApp Admin:</strong> Hubungi WhatsApp <span className="font-mono text-amber-300 font-semibold">{formattedAdminPhone}</span> dengan menyertakan Nomor Tiket Sesi dan bukti transaksi/kendala.
+                      </li>
+                      <li>
+                        <strong className="text-zinc-200">Via Email Resmi:</strong> Kirimkan ke <span className="text-amber-400 font-semibold">mochamadhennysoeyono@gmail.com</span>.
+                      </li>
+                    </ul>
                     <p className="text-xs text-emerald-400 font-medium pt-1">
-                      ⚡ Tim dukungan kami akan meninjau log transaksi dan memproses pengembalian dana dalam 1x24 jam hingga maksimal 3 hari kerja.
+                      ⚡ Pengembalian dana tunai diproses seketika di kasir. Pengembalian via transfer bank/e-wallet diproses dalam waktu 1x24 jam hingga maksimal 3 hari kerja.
                     </p>
                   </div>
                 </div>
@@ -269,7 +299,61 @@ export const LegalInfoModal: React.FC<LegalInfoModalProps> = ({
             </div>
           )}
 
-          {/* TAB 3: HUBUNGI KAMI */}
+          {/* TAB 3: KEBIJAKAN PRIVASI */}
+          {activeTab === 'privacy' && (
+            <div className="space-y-5 animate-in fade-in duration-150">
+              <div className="border-b border-zinc-800 pb-3">
+                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                  <Shield className="w-5 h-5 text-amber-400" />
+                  Kebijakan Privasi (Privacy Policy)
+                </h3>
+                <p className="text-xs text-zinc-400 mt-1">
+                  Komitmen perlindungan data pribadi dan privasi foto di AimBoth
+                </p>
+              </div>
+
+              <div className="space-y-4 text-xs sm:text-sm text-zinc-400">
+                <p>
+                  AimBoth sangat menghormati privasi setiap pengunjung. Kebijakan Privasi ini menjelaskan bagaimana data dan foto hasil sesi photobooth Anda dikelola secara aman dan bertanggung jawab.
+                </p>
+
+                <div>
+                  <h4 className="font-semibold text-white text-sm mb-1">1. Data yang Dikumpulkan</h4>
+                  <p>
+                    Kami hanya mengumpulkan data yang mutlak diperlukan untuk operasional photobooth:
+                  </p>
+                  <ul className="list-disc list-inside space-y-1 mt-1 text-zinc-400 ml-1">
+                    <li>Foto dan rekaman klip boomerang yang diambil selama sesi aktif di kiosk.</li>
+                    <li>Informasi transaksi (Nomor Tiket Sesi, rincian paket, nominal, dan metode pembayaran).</li>
+                    <li>Nomor WhatsApp kontak yang digunakan saat pengguna menghubungi admin untuk menerima softfile digital HD.</li>
+                  </ul>
+                </div>
+
+                <div>
+                  <h4 className="font-semibold text-white text-sm mb-1">2. Penggunaan Data & Komitmen Anti-Spam</h4>
+                  <p>
+                    Nomor WhatsApp Anda hanya digunakan secara eksklusif untuk mengirimkan file foto/video asli beresolusi tinggi dan bukti konfirmasi pemesanan. <strong className="text-zinc-200">Kami menjamin 100% TIDAK ADA SPAM:</strong> nomor Anda tidak akan pernah dijual, disebarkan, atau digunakan untuk pesan penawaran/marketing yang tidak diminta.
+                  </p>
+                </div>
+
+                <div>
+                  <h4 className="font-semibold text-white text-sm mb-1">3. Keamanan & Retensi Penyimpanan Foto</h4>
+                  <p>
+                    Foto disimpan pada infrastruktur cloud terenkripsi semata-mata agar admin dapat mengirimkannya ke WhatsApp pengguna. Pengguna memiliki hak penuh untuk meminta penghapusan permanen file foto dari sistem penyimpanan cloud kami kapan saja dengan menghubungi admin.
+                  </p>
+                </div>
+
+                <div>
+                  <h4 className="font-semibold text-white text-sm mb-1">4. Keamanan Transaksi</h4>
+                  <p>
+                    Semua transmisi web dilindungi enkripsi SSL/TLS (HTTPS). Untuk pembayaran QRIS, seluruh verifikasi transaksi dilakukan melalui gerbang pembayaran berstandar keamanan Bank Indonesia (BI). AimBoth tidak pernah menyimpan data rahasia seperti PIN, OTP, atau nomor kartu perbankan pengguna.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 4: HUBUNGI KAMI */}
           {activeTab === 'contact' && (
             <div className="space-y-5 animate-in fade-in duration-150">
               <div className="border-b border-zinc-800 pb-3">
@@ -278,7 +362,7 @@ export const LegalInfoModal: React.FC<LegalInfoModalProps> = ({
                   Hubungi Kami (Customer Support)
                 </h3>
                 <p className="text-xs text-zinc-400 mt-1">
-                  Informasi kontak resmi pengelola layanan AimBoth & Photobooth Kiosk
+                  Kontak resmi pengelola layanan AimBoth & Booth Operator
                 </p>
               </div>
 
@@ -289,6 +373,24 @@ export const LegalInfoModal: React.FC<LegalInfoModalProps> = ({
                   <p className="text-sm font-bold text-white">AimBoth (AimSpace)</p>
                   <span className="text-xs text-zinc-400 block pt-1">
                     Penanggung Jawab: <strong className="text-zinc-200">Mochamad Henny Soeyono</strong>
+                  </span>
+                </div>
+
+                {/* WhatsApp Admin Booth */}
+                <div className="p-4 rounded-xl bg-zinc-900/80 border border-zinc-800 space-y-1">
+                  <span className="text-[10px] font-mono uppercase text-emerald-400 tracking-wider flex items-center gap-1">
+                    <MessageSquare className="w-3 h-3" /> WhatsApp Admin Booth
+                  </span>
+                  <a
+                    href={waContactUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs sm:text-sm font-semibold text-emerald-400 hover:underline break-all block"
+                  >
+                    {formattedAdminPhone}
+                  </a>
+                  <span className="text-[11px] text-zinc-400 block pt-1">
+                    Untuk konfirmasi bayar & penerimaan softfile
                   </span>
                 </div>
 
@@ -317,79 +419,27 @@ export const LegalInfoModal: React.FC<LegalInfoModalProps> = ({
                     Kiosk Online: <strong className="text-white">24 Jam / 7 Hari</strong>
                   </p>
                   <p className="text-[11px] text-zinc-400">
-                    Customer Support: Senin – Sabtu, 08:00 – 21:00 WIB
-                  </p>
-                </div>
-
-                {/* Alamat & Wilayah Operasi */}
-                <div className="p-4 rounded-xl bg-zinc-900/80 border border-zinc-800 space-y-1">
-                  <span className="text-[10px] font-mono uppercase text-amber-400 tracking-wider flex items-center gap-1">
-                    <MapPin className="w-3 h-3" /> Lokasi & Operasional
-                  </span>
-                  <p className="text-xs text-zinc-300 font-medium">
-                    Jawa Timur, Indonesia
-                  </p>
-                  <p className="text-[11px] text-zinc-400">
-                    Melayani event indoor, pernikahan, wisuda, pameran, & festival
+                    Customer Support: Setiap Hari, 08:00 – 22:00 WIB
                   </p>
                 </div>
               </div>
 
-              {/* Quick Contact Form / Mailto CTA */}
-              <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 flex flex-col sm:flex-row items-center justify-between gap-3">
+              {/* Quick Contact Form / WhatsApp & Mail CTA */}
+              <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex flex-col sm:flex-row items-center justify-between gap-3">
                 <div>
-                  <h4 className="text-xs sm:text-sm font-bold text-white">Butuh Bantuan Cepat atau Refund?</h4>
-                  <p className="text-[11px] text-zinc-400">Hubungi email resmi kami dengan menyertakan detail ID pesanan Anda.</p>
+                  <h4 className="text-xs sm:text-sm font-bold text-white">Butuh Bantuan Langsung via WhatsApp?</h4>
+                  <p className="text-[11px] text-zinc-400">Hubungi admin operator photobooth untuk klaim softfile atau pertanyaan teknis.</p>
                 </div>
                 <a
-                  href="mailto:mochamadhennysoeyono@gmail.com?subject=Pertanyaan%20/%20Klaim%20Refund%20AimBoth"
-                  className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-zinc-950 font-bold text-xs flex items-center gap-1.5 transition-colors shrink-0"
+                  href={waContactUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-bold text-xs flex items-center gap-1.5 transition-colors shrink-0"
                 >
-                  <Mail className="w-3.5 h-3.5" />
-                  <span>Kirim Email Sekarang</span>
+                  <MessageSquare className="w-3.5 h-3.5 fill-current" />
+                  <span>Chat WhatsApp Admin</span>
+                  <ArrowRight className="w-3 h-3 stroke-[3]" />
                 </a>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 4: KEBIJAKAN PRIVASI */}
-          {activeTab === 'privacy' && (
-            <div className="space-y-5 animate-in fade-in duration-150">
-              <div className="border-b border-zinc-800 pb-3">
-                <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                  <Shield className="w-5 h-5 text-amber-400" />
-                  Kebijakan Privasi (Privacy Policy)
-                </h3>
-                <p className="text-xs text-zinc-400 mt-1">
-                  Bagaimana AimBoth melindungi data dan privasi foto Anda
-                </p>
-              </div>
-
-              <div className="space-y-4 text-xs sm:text-sm text-zinc-400">
-                <p>
-                  AimBoth sangat menghormati privasi pengunjung photobooth kami. Kebijakan Privasi ini menjelaskan jenis data yang kami kumpulkan dan bagaimana data tersebut digunakan secara aman.
-                </p>
-
-                <div>
-                  <h4 className="font-semibold text-white text-sm mb-1">1. Data yang Dikumpulkan</h4>
-                  <p>
-                    Kami hanya memproses foto yang diambil selama sesi aktif dan data transaksi pembayaran (ID pesanan, nominal, dan metode pembayaran). Kami tidak meminta atau mengumpulkan nomor kartu kredit/debit secara langsung; seluruh pembayaran diproses oleh Payment Gateway bersertifikasi PCI-DSS.
-                  </p>
-                </div>
-
-                <div>
-                  <h4 className="font-semibold text-white text-sm mb-1">2. Penggunaan Foto Pengguna</h4>
-                  <p>
-                    Foto yang diambil hanya digunakan untuk tujuan pencetakan fisik langsung di kiosk dan penyimpanan sementara di server cloud Supabase kami agar pengguna dapat mengunduh foto digital beresolusi tinggi melalui scan QR Code.
-                  </p>
-                </div>
-
-                <div>
-                  <h4 className="font-semibold text-white text-sm mb-1">3. Keamanan Data</h4>
-                  <p>
-                    Semua transmisi data antara browser/kiosk dan server kami dilindungi menggunakan enkripsi SSL/TLS (HTTPS). Foto Anda disimpan secara aman dan tidak dibagikan kepada pihak ketiga manapun untuk tujuan komersial.
-                  </p>
-                </div>
               </div>
             </div>
           )}
@@ -409,3 +459,4 @@ export const LegalInfoModal: React.FC<LegalInfoModalProps> = ({
     </div>
   );
 };
+

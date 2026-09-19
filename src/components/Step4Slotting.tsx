@@ -196,6 +196,15 @@ export const Step4Slotting: React.FC<Step4SlottingProps> = ({
                         />
                       )}
 
+                      {filter.vignette && (
+                        <div
+                          className="absolute inset-0 pointer-events-none"
+                          style={{
+                            background: `radial-gradient(ellipse at center, rgba(0,0,0,0) ${(filter.vignette.innerRadius ?? 0.28) * 100}%, rgba(0,0,0,${filter.vignette.intensity * 0.35}) 50%, rgba(0,0,0,${filter.vignette.intensity * 0.70}) 75%, rgba(0,0,0,${filter.vignette.intensity}) ${(filter.vignette.outerRadius ?? 0.95) * 100}%)`,
+                          }}
+                        />
+                      )}
+
                       {/* Remove photo button on hover */}
                       <button
                         onClick={(e) => handleClearSlot(slot.index, e)}
@@ -291,6 +300,24 @@ export const Step4Slotting: React.FC<Step4SlottingProps> = ({
                   className="w-full h-full object-cover"
                   style={{ filter: filter.cssFilter }}
                 />
+
+                {filter.tint && (
+                  <div
+                    className="absolute inset-0 pointer-events-none"
+                    style={{
+                      backgroundColor: `rgba(${filter.tint.r}, ${filter.tint.g}, ${filter.tint.b}, ${filter.tint.alpha})`,
+                    }}
+                  />
+                )}
+
+                {filter.vignette && (
+                  <div
+                    className="absolute inset-0 pointer-events-none"
+                    style={{
+                      background: `radial-gradient(ellipse at center, rgba(0,0,0,0) ${(filter.vignette.innerRadius ?? 0.28) * 100}%, rgba(0,0,0,${filter.vignette.intensity * 0.45}) 55%, rgba(0,0,0,${filter.vignette.intensity}) 100%)`,
+                    }}
+                  />
+                )}
 
                 <span className="absolute bottom-1 left-1 bg-black/70 text-[9px] font-mono px-1 rounded text-white">
                   #{idx + 1}

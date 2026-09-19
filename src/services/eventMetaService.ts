@@ -4,6 +4,14 @@ export interface EventMetadata {
   lokasi?: string;
   tanggal?: string;
   subtitle?: string;
+  isFreeEvent?: boolean;
+  hargaDigital?: number;
+  hargaPrint?: number;
+  promoBadge?: string;
+  promoDescription?: string;
+  paymentMethodsAllowed?: 'all' | 'cash' | 'digital';
+  packagesAllowed?: 'both' | 'digital_only' | 'print_only';
+  cashInstruction?: string;
 }
 
 const META_STORAGE_KEY = 'photobooth_events_meta';
@@ -129,9 +137,15 @@ export async function saveEventMetadata(
       new CustomEvent('photobooth_event_updated', {
         detail: {
           id: eventId,
-          lokasi: updatedEventMeta.lokasi,
-          subtitle: updatedEventMeta.subtitle,
-          tanggal: updatedEventMeta.tanggal,
+          ...updatedEventMeta,
+        },
+      })
+    );
+    window.dispatchEvent(
+      new CustomEvent('photobooth-event-config-updated', {
+        detail: {
+          id: eventId,
+          ...updatedEventMeta,
         },
       })
     );

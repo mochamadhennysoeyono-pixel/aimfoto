@@ -25,8 +25,14 @@ import {
   ZoomOut,
   RotateCcw,
   Check,
+  Move,
+  ChevronUp,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Sliders,
 } from 'lucide-react';
-import { FilterPreset, PhotoboothLayout, CustomDecorationItem } from '../types';
+import { FilterPreset, PhotoboothLayout, CustomDecorationItem, SlotAdjustment, SlotAdjustmentsMap } from '../types';
 import { generateUuid } from '../utils/uuid';
 
 interface Step7OverlayProps {
@@ -38,6 +44,8 @@ interface Step7OverlayProps {
   filter: FilterPreset;
   decorations?: CustomDecorationItem[];
   onUpdateDecorations: (decorations: CustomDecorationItem[]) => void;
+  slotAdjustments?: SlotAdjustmentsMap;
+  onUpdateSlotAdjustments?: (adjustments: SlotAdjustmentsMap) => void;
   onNext: () => void;
   onBack: () => void;
 }
@@ -54,6 +62,10 @@ const FONT_PRESETS = [
 
 // Kategori & Pilihan Emoji
 const EMOJI_CATEGORIES = [
+  {
+    name: '🎨 Doodle & Komik Pop',
+    emojis: ['💭', '🗯️', '💬', '💥', '💫', '⚡', '🖍️', '✏️', '👓', '👀', '🎀', '🐾', '⭐', '✨', '🔥', '💯'],
+  },
   {
     name: '🎉 Pesta & Selebrasi',
     emojis: ['🎉', '🥳', '🍾', '🥂', '✨', '🎈', '🎂', '👑', '🎊', '🪩'],
@@ -107,12 +119,15 @@ export const Step7Overlay: React.FC<Step7OverlayProps> = ({
   filter,
   decorations = [],
   onUpdateDecorations,
+  slotAdjustments = {},
+  onUpdateSlotAdjustments,
   onNext,
   onBack,
 }) => {
   const [showOverlay, setShowOverlay] = useState(true);
-  const [activeTab, setActiveTab] = useState<'text' | 'emoji' | 'layers'>('text');
+  const [activeTab, setActiveTab] = useState<'text' | 'emoji' | 'adjust-photo' | 'layers'>('text');
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+  const [selectedSlotToAdjust, setSelectedSlotToAdjust] = useState<number>(0);
 
   // Mode Rentangkan Canvas Full Layar
   const [isCanvasExpanded, setIsCanvasExpanded] = useState(false);
@@ -410,8 +425,9 @@ export const Step7Overlay: React.FC<Step7OverlayProps> = ({
 
       {/* Layer 2: Slotted Photos */}
       {slots.map((slot, i) => {
-        const slotKey = slot.index ?? i;
+        const slotKey = i;
         const photoSrc = slotAssignments[slotKey] || photos[i] || photos[0];
+        const adj = slotAdjustments[slotKey] || { panX: 0, panY: 0, zoom: 1 };
 
         return (
           <div
@@ -429,16 +445,38 @@ export const Step7Overlay: React.FC<Step7OverlayProps> = ({
             {photoSrc ? (
               <img
                 src={photoSrc}
-                alt={`Slot ${slotKey + 1}`}
-                className="w-full h-full object-cover pointer-events-none"
+                alt={`Slot ${i + 1}`}
+                className="w-full h-full object-cover pointer-events-none transition-transform duration-75"
                 style={{
                   filter: filter ? filter.cssFilter : 'none',
+                  transform: `translate(${adj.panX}%, ${adj.panY}%) scale(${adj.zoom})`,
+                  transformOrigin: 'center center',
                 }}
               />
             ) : (
               <div className="w-full h-full bg-zinc-800 flex items-center justify-center text-zinc-600 font-mono text-[10px]">
-                Foto {slotKey + 1}
+                Foto {i + 1}
               </div>
+            )}
+
+            {/* Optional Tint */}
+            {filter?.tint && (
+              <div
+                className="absolute inset-0 pointer-events-none"
+                style={{
+                  backgroundColor: `rgba(${filter.tint.r}, ${filter.tint.g}, ${filter.tint.b}, ${filter.tint.alpha})`,
+                }}
+              />
+            )}
+
+            {/* Portrait Spotlight Vignette */}
+            {filter?.vignette && (
+              <div
+                className="absolute inset-0 pointer-events-none"
+                style={{
+                  background: `radial-gradient(ellipse at center, rgba(0,0,0,0) ${(filter.vignette.innerRadius ?? 0.28) * 100}%, rgba(0,0,0,${filter.vignette.intensity * 0.35}) 50%, rgba(0,0,0,${filter.vignette.intensity * 0.70}) 75%, rgba(0,0,0,${filter.vignette.intensity}) ${(filter.vignette.outerRadius ?? 0.95) * 100}%)`,
+                }}
+              />
             )}
           </div>
         );
@@ -661,6 +699,21 @@ export const Step7Overlay: React.FC<Step7OverlayProps> = ({
           >
             <Smile className="w-3.5 h-3.5" />
             <span>Emoji & Stiker</span>
+          </button>
+
+          <button
+            onClick={() => {
+              setActiveTab('adjust-photo');
+              setSelectedItemId(null);
+            }}
+            className={`px-2.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+              activeTab === 'adjust-photo'
+                ? 'bg-amber-500 text-zinc-950 shadow-md shadow-amber-500/20'
+                : 'bg-zinc-950 text-zinc-400 hover:text-white border border-zinc-800'
+            }`}
+          >
+            <Move className="w-3.5 h-3.5" />
+            <span>Pas-kan Foto</span>
           </button>
 
           <button
@@ -1118,6 +1171,197 @@ export const Step7Overlay: React.FC<Step7OverlayProps> = ({
               })}
             </div>
           )}
+        </div>
+      )}
+
+      {/* TAB 4: PENYESUAIAN POSISI FOTO DI BINGKAI */}
+      {activeTab === 'adjust-photo' && (
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2 bg-zinc-950 p-2.5 rounded-xl border border-zinc-800">
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-zinc-300 font-semibold flex items-center gap-1">
+                <Sliders className="w-3.5 h-3.5 text-amber-400" />
+                Pilih Slot Foto:
+              </span>
+              <div className="flex items-center gap-1">
+                {slots.map((_, idx) => {
+                  const isSelected = selectedSlotToAdjust === idx;
+                  return (
+                    <button
+                      key={idx}
+                      onClick={() => setSelectedSlotToAdjust(idx)}
+                      className={`w-7 h-7 rounded-lg text-xs font-bold font-mono transition-all cursor-pointer ${
+                        isSelected
+                          ? 'bg-amber-500 text-zinc-950 shadow-md scale-105'
+                          : 'bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white'
+                      }`}
+                    >
+                      {idx + 1}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-mono text-zinc-400">
+                Pan X: {Math.round(slotAdjustments[selectedSlotToAdjust]?.panX || 0)}% | Y: {Math.round(slotAdjustments[selectedSlotToAdjust]?.panY || 0)}%
+              </span>
+              <button
+                onClick={() => {
+                  if (onUpdateSlotAdjustments) {
+                    onUpdateSlotAdjustments({
+                      ...slotAdjustments,
+                      [selectedSlotToAdjust]: { panX: 0, panY: 0, zoom: 1 },
+                    });
+                  }
+                }}
+                className="px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[11px] font-medium flex items-center gap-1 transition-colors cursor-pointer"
+                title="Kembalikan foto slot ini ke tengah"
+              >
+                <RotateCcw className="w-3 h-3" />
+                <span>Reset</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center bg-zinc-950 p-3 rounded-xl border border-zinc-800">
+            {/* Zoom Slider */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  if (onUpdateSlotAdjustments) {
+                    const cur = slotAdjustments[selectedSlotToAdjust] || { panX: 0, panY: 0, zoom: 1 };
+                    const nextZoom = Math.max(0.8, Math.min(2.8, Math.round((cur.zoom - 0.1) * 100) / 100));
+                    onUpdateSlotAdjustments({
+                      ...slotAdjustments,
+                      [selectedSlotToAdjust]: { ...cur, zoom: nextZoom },
+                    });
+                  }
+                }}
+                className="p-1.5 rounded-lg bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 text-zinc-300 cursor-pointer"
+                title="Perkecil"
+              >
+                <ZoomOut className="w-3.5 h-3.5" />
+              </button>
+
+              <div className="flex-1 flex flex-col gap-0.5">
+                <div className="flex justify-between text-[10px] text-zinc-400 font-mono">
+                  <span>Zoom Foto Slot #{selectedSlotToAdjust + 1}</span>
+                  <span className="text-amber-400 font-bold">
+                    {Math.round((slotAdjustments[selectedSlotToAdjust]?.zoom || 1) * 100)}%
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="0.8"
+                  max="2.5"
+                  step="0.05"
+                  value={slotAdjustments[selectedSlotToAdjust]?.zoom || 1}
+                  onChange={(e) => {
+                    if (onUpdateSlotAdjustments) {
+                      const cur = slotAdjustments[selectedSlotToAdjust] || { panX: 0, panY: 0, zoom: 1 };
+                      onUpdateSlotAdjustments({
+                        ...slotAdjustments,
+                        [selectedSlotToAdjust]: { ...cur, zoom: parseFloat(e.target.value) },
+                      });
+                    }
+                  }}
+                  className="w-full accent-amber-500 h-1.5 bg-zinc-800 rounded-lg cursor-pointer"
+                />
+              </div>
+
+              <button
+                onClick={() => {
+                  if (onUpdateSlotAdjustments) {
+                    const cur = slotAdjustments[selectedSlotToAdjust] || { panX: 0, panY: 0, zoom: 1 };
+                    const nextZoom = Math.max(0.8, Math.min(2.8, Math.round((cur.zoom + 0.1) * 100) / 100));
+                    onUpdateSlotAdjustments({
+                      ...slotAdjustments,
+                      [selectedSlotToAdjust]: { ...cur, zoom: nextZoom },
+                    });
+                  }
+                }}
+                className="p-1.5 rounded-lg bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 text-zinc-300 cursor-pointer"
+                title="Perbesar"
+              >
+                <ZoomIn className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            {/* D-Pad Micro Nudge */}
+            <div className="flex items-center justify-between sm:justify-end gap-2 text-xs">
+              <span className="text-[11px] text-zinc-400">Geser Presisi (D-Pad):</span>
+              <div className="flex items-center gap-1 bg-zinc-900 p-1 rounded-xl border border-zinc-800">
+                <button
+                  onClick={() => {
+                    if (onUpdateSlotAdjustments) {
+                      const cur = slotAdjustments[selectedSlotToAdjust] || { panX: 0, panY: 0, zoom: 1 };
+                      const newPanX = Math.max(-80, Math.min(80, Math.round((cur.panX - 3) * 10) / 10));
+                      onUpdateSlotAdjustments({
+                        ...slotAdjustments,
+                        [selectedSlotToAdjust]: { ...cur, panX: newPanX },
+                      });
+                    }
+                  }}
+                  className="p-1 rounded hover:bg-zinc-800 text-zinc-300 cursor-pointer active:scale-95"
+                  title="Geser Kiri"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <div className="flex flex-col gap-0.5">
+                  <button
+                    onClick={() => {
+                      if (onUpdateSlotAdjustments) {
+                        const cur = slotAdjustments[selectedSlotToAdjust] || { panX: 0, panY: 0, zoom: 1 };
+                        const newPanY = Math.max(-80, Math.min(80, Math.round((cur.panY - 3) * 10) / 10));
+                        onUpdateSlotAdjustments({
+                          ...slotAdjustments,
+                          [selectedSlotToAdjust]: { ...cur, panY: newPanY },
+                        });
+                      }
+                    }}
+                    className="p-0.5 rounded hover:bg-zinc-800 text-zinc-300 cursor-pointer active:scale-95"
+                    title="Geser Atas"
+                  >
+                    <ChevronUp className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (onUpdateSlotAdjustments) {
+                        const cur = slotAdjustments[selectedSlotToAdjust] || { panX: 0, panY: 0, zoom: 1 };
+                        const newPanY = Math.max(-80, Math.min(80, Math.round((cur.panY + 3) * 10) / 10));
+                        onUpdateSlotAdjustments({
+                          ...slotAdjustments,
+                          [selectedSlotToAdjust]: { ...cur, panY: newPanY },
+                        });
+                      }
+                    }}
+                    className="p-0.5 rounded hover:bg-zinc-800 text-zinc-300 cursor-pointer active:scale-95"
+                    title="Geser Bawah"
+                  >
+                    <ChevronDown className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+                <button
+                  onClick={() => {
+                    if (onUpdateSlotAdjustments) {
+                      const cur = slotAdjustments[selectedSlotToAdjust] || { panX: 0, panY: 0, zoom: 1 };
+                      const newPanX = Math.max(-80, Math.min(80, Math.round((cur.panX + 3) * 10) / 10));
+                      onUpdateSlotAdjustments({
+                        ...slotAdjustments,
+                        [selectedSlotToAdjust]: { ...cur, panX: newPanX },
+                      });
+                    }
+                  }}
+                  className="p-1 rounded hover:bg-zinc-800 text-zinc-300 cursor-pointer active:scale-95"
+                  title="Geser Kanan"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

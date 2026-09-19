@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import { FrameTheme, FrameLayoutItem, PhotoboothLayout, LayoutSlot } from '../types';
 import { supabase } from '../supabaseClient';
-import { DEFAULT_LAYOUTS, compareLayoutNames } from '../data/defaultLayouts';
+import { DEFAULT_LAYOUTS, compareLayoutNames, normalizeLayout } from '../data/defaultLayouts';
 
 interface Step3LayoutSelectProps {
   selectedTheme: FrameTheme;
@@ -62,7 +62,7 @@ export const Step3LayoutSelect: React.FC<Step3LayoutSelectProps> = ({
               }
             }
 
-            layoutObj = {
+            layoutObj = normalizeLayout({
               id: item.layout.id,
               name: item.layout.name || 'Layout Photobooth',
               ratio: item.layout.ratio || '2:3',
@@ -70,7 +70,7 @@ export const Step3LayoutSelect: React.FC<Step3LayoutSelectProps> = ({
               canvas_height: item.layout.canvas_height || 1800,
               photo_count: item.layout.photo_count || parsedSlots.length || 1,
               slots: parsedSlots,
-            };
+            });
           } else {
             layoutObj = DEFAULT_LAYOUTS[0];
           }
@@ -231,7 +231,7 @@ export const Step3LayoutSelect: React.FC<Step3LayoutSelectProps> = ({
                           }}
                           className="bg-zinc-800/90 border border-zinc-700/60 flex items-center justify-center text-[7px] font-mono text-zinc-500 font-bold"
                         >
-                          #{slot.index ?? i + 1}
+                          #{i + 1}
                         </div>
                       ))}
 
@@ -241,6 +241,9 @@ export const Step3LayoutSelect: React.FC<Step3LayoutSelectProps> = ({
                           src={combo.image_url}
                           alt={layout.name}
                           className="absolute inset-0 w-full h-full object-fill pointer-events-none"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                          }}
                         />
                       ) : (
                         <div className="absolute inset-0 border border-amber-500/20 pointer-events-none rounded" />

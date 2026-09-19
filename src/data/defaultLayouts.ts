@@ -118,3 +118,32 @@ export function compareLayoutNames(nameA?: string, nameB?: string): number {
 export function sortLayoutsList<T extends { name?: string }>(list: T[]): T[] {
   return [...list].sort((a, b) => compareLayoutNames(a.name, b.name));
 }
+
+/**
+ * Normalizes any photobooth layout so its slots are cleanly ordered
+ * and indexed 0, 1, 2, ... N-1 without jumps, offsets, or holes.
+ */
+export function normalizeLayout(layout: PhotoboothLayout): PhotoboothLayout {
+  if (!layout) return layout;
+  let rawSlots: any[] = [];
+  if (Array.isArray(layout.slots)) {
+    rawSlots = layout.slots;
+  } else if (typeof layout.slots === 'string') {
+    try {
+      rawSlots = JSON.parse(layout.slots);
+    } catch {
+      rawSlots = [];
+    }
+  }
+
+  const normalizedSlots = rawSlots.map((slot, idx) => ({
+    ...slot,
+    index: idx,
+  }));
+
+  return {
+    ...layout,
+    photo_count: normalizedSlots.length || layout.photo_count || 1,
+    slots: normalizedSlots,
+  };
+}

@@ -182,6 +182,16 @@ export const Step4Frames: React.FC<Step4FramesProps> = ({
             />
           )}
 
+          {/* Portrait Spotlight Vignette */}
+          {activeFilter.vignette && (
+            <div
+              className="absolute inset-0 pointer-events-none"
+              style={{
+                background: `radial-gradient(ellipse at center, rgba(0,0,0,0) ${(activeFilter.vignette.innerRadius ?? 0.28) * 100}%, rgba(0,0,0,${activeFilter.vignette.intensity * 0.35}) 50%, rgba(0,0,0,${activeFilter.vignette.intensity * 0.70}) 75%, rgba(0,0,0,${activeFilter.vignette.intensity}) ${(activeFilter.vignette.outerRadius ?? 0.95) * 100}%)`,
+              }}
+            />
+          )}
+
           {/* Transparent Frame Overlay - HANYA tampil jika activeFrame ada dan memiliki urlGambar */}
           {activeFrame && activeFrame.urlGambar ? (
             <img

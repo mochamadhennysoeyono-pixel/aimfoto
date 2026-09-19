@@ -21,9 +21,10 @@ import {
   FrameLayoutItem,
   PhotoboothLayout,
   CustomDecorationItem,
+  SlotAdjustmentsMap,
 } from './types';
 import { FILTER_PRESETS } from './data/filters';
-import { DEFAULT_LAYOUTS } from './data/defaultLayouts';
+import { DEFAULT_LAYOUTS, normalizeLayout } from './data/defaultLayouts';
 import { generateUuid } from './utils/uuid';
 import { supabase, HARDCODED_EVENT_ID } from './supabaseClient';
 import { fetchEventsMetadata, getCachedEventMetadata } from './services/eventMetaService';
@@ -140,7 +141,24 @@ export default function App() {
           parsed.nama !== 'ADMIN_CONFIG' &&
           !parsed.nama.toUpperCase().includes('ADMIN_CONFIG')
         ) {
-          return parsed;
+          const hFoto = parsed.hargaPerFoto !== undefined ? parsed.hargaPerFoto : 25000;
+          return {
+            id: HARDCODED_EVENT_ID,
+            nama: 'AIM SPACE Studio',
+            subtitle: 'Photobooth Rumahan & Event — Abadikan Momen Spesial Berkualitas Tinggi',
+            tanggal: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }),
+            lokasi: 'AIM SPACE Studio',
+            hargaPerFoto: hFoto,
+            hargaDigital: parsed.hargaDigital !== undefined ? parsed.hargaDigital : (hFoto === 0 ? 0 : 10000),
+            hargaPrint: parsed.hargaPrint !== undefined ? parsed.hargaPrint : (hFoto === 0 ? 0 : 25000),
+            isFreeEvent: parsed.isFreeEvent ?? (hFoto === 0),
+            paymentMethodsAllowed: parsed.paymentMethodsAllowed || 'all',
+            promoBadge: parsed.promoBadge || 'Promo Spesial Studio Rumahan',
+            promoDescription: parsed.promoDescription || 'Hasil foto tajam resolusi tinggi 300 DPI, pencahayaan optimal, & cetak instan!',
+            cashInstruction: parsed.cashInstruction || 'Serahkan uang tunai langsung ke kasir atau operator photobooth',
+            tipeEvent: 'Studio Rumahan & Event',
+            ...parsed,
+          };
         } else {
           localStorage.removeItem('photobooth_cached_event_config');
         }
@@ -152,14 +170,55 @@ export default function App() {
     const cachedMeta = getCachedEventMetadata(HARDCODED_EVENT_ID);
     return {
       id: HARDCODED_EVENT_ID,
-      nama: 'AIM SPACE',
-      subtitle: 'Simpan memori spesial Anda dengan photobooth digital beresolusi tinggi',
+      nama: 'AIM SPACE Studio',
+      subtitle: 'Photobooth Rumahan & Event — Abadikan Momen Spesial Berkualitas Tinggi',
       tanggal: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }),
       lokasi: cachedMeta?.lokasi || 'AIM SPACE Studio',
-      hargaPerFoto: 10000,
-      tipeEvent: 'Exhibition & Celebration',
+      hargaPerFoto: 25000,
+      hargaDigital: 10000,
+      hargaPrint: 25000,
+      isFreeEvent: false,
+      paymentMethodsAllowed: 'all',
+      promoBadge: 'Promo Spesial Studio Rumahan',
+      promoDescription: 'Hasil foto tajam resolusi tinggi 300 DPI, pencahayaan optimal, & cetak instan!',
+      cashInstruction: 'Serahkan uang tunai langsung ke kasir atau operator photobooth',
+      tipeEvent: 'Studio Rumahan & Event',
     };
   });
+
+  // Paket terpilih: 'digital' atau 'print' (default print + digital atau sesuai konfigurasi paket aktif)
+  const [selectedPackage, setSelectedPackage] = useState<'digital' | 'print'>(() => {
+    try {
+      const cached = localStorage.getItem('photobooth_cached_event_config');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed?.packagesAllowed === 'digital_only') return 'digital';
+        if (parsed?.packagesAllowed === 'print_only') return 'print';
+      }
+    } catch (e) {}
+    return 'print';
+  });
+
+  // Real-time listener jika admin mengupdate harga, metode pembayaran, atau opsi paket
+  useEffect(() => {
+    const handleConfigUpdate = (e: any) => {
+      if (e.detail) {
+        setEventConfig((prev) => {
+          const next = { ...prev, ...e.detail };
+          if (next.packagesAllowed === 'digital_only') {
+            setSelectedPackage('digital');
+          } else if (next.packagesAllowed === 'print_only') {
+            setSelectedPackage('print');
+          }
+          return next;
+        });
+      }
+    };
+    window.addEventListener('photobooth-event-config-updated', handleConfigUpdate);
+    return () => {
+      window.removeEventListener('photobooth-event-config-updated', handleConfigUpdate);
+    };
+  }, []);
 
   // Active step in 10-step sequence:
   // 1: event-info
@@ -202,6 +261,7 @@ export default function App() {
       status: 'draft',
       eventId: HARDCODED_EVENT_ID,
       decorations: [],
+      slotAdjustments: {},
     };
   });
 
@@ -304,10 +364,20 @@ export default function App() {
             ? Number(eventData.default_price)
             : (Number(eventData.harga_per_foto) || 10000);
 
-        // Ambil metadata dinamis (lokasi, subtitle, dll) dari Supabase / cache
+        // Ambil metadata dinamis (lokasi, subtitle, packagesAllowed, dll) dari Supabase / cache
         const metaMap = await fetchEventsMetadata();
         const eventMeta = metaMap[eventData.id] || {};
         const dynamicLocation = eventMeta.lokasi || (eventData as any).lokasi || 'AIM SPACE Studio';
+
+        // Baca cache lokal yang mungkin sudah diedit admin
+        let localCached: any = {};
+        try {
+          const raw = localStorage.getItem('photobooth_cached_event_config');
+          if (raw) localCached = JSON.parse(raw);
+        } catch (e) {}
+
+        const finalPackagesAllowed =
+          localCached.packagesAllowed || eventMeta.packagesAllowed || 'both';
 
         const config: EventConfig = {
           id: eventData.id,
@@ -316,8 +386,22 @@ export default function App() {
           tanggal: eventMeta.tanggal || eventData.tanggal || new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }),
           lokasi: dynamicLocation,
           hargaPerFoto: sessionPrice,
+          hargaDigital: localCached.hargaDigital ?? eventMeta.hargaDigital ?? 10000,
+          hargaPrint: localCached.hargaPrint ?? eventMeta.hargaPrint ?? (sessionPrice > 0 ? sessionPrice : 25000),
+          isFreeEvent: localCached.isFreeEvent ?? eventMeta.isFreeEvent ?? false,
+          paymentMethodsAllowed: localCached.paymentMethodsAllowed ?? eventMeta.paymentMethodsAllowed ?? 'all',
+          packagesAllowed: finalPackagesAllowed,
+          promoBadge: localCached.promoBadge ?? eventMeta.promoBadge,
+          promoDescription: localCached.promoDescription ?? eventMeta.promoDescription,
+          cashInstruction: localCached.cashInstruction ?? eventMeta.cashInstruction,
           tipeEvent: eventData.tipe || 'Exhibition & Celebration',
         };
+
+        if (finalPackagesAllowed === 'digital_only') {
+          setSelectedPackage('digital');
+        } else if (finalPackagesAllowed === 'print_only') {
+          setSelectedPackage('print');
+        }
 
         setEventConfig(config);
         setOrder((prev) => ({ ...prev, harga: sessionPrice }));
@@ -413,6 +497,7 @@ export default function App() {
       status: 'draft',
       eventId: eventConfig.id || HARDCODED_EVENT_ID,
       decorations: [],
+      slotAdjustments: {},
     });
     setOrder({
       id: generateUuid(),
@@ -442,7 +527,7 @@ export default function App() {
   // Step 3: Layout Variant selected -> Step 4 Camera
   const handleLayoutVariantSelected = (combination: FrameLayoutItem) => {
     setSelectedFrameLayout(combination);
-    const layoutObj = combination.layout || DEFAULT_LAYOUTS[0];
+    const layoutObj = normalizeLayout(combination.layout || DEFAULT_LAYOUTS[0]);
     setActiveLayout(layoutObj);
     setActiveFramePngUrl(combination.image_url || '');
 
@@ -456,23 +541,43 @@ export default function App() {
   };
 
   // Step 4: Photos captured -> Step 5 Filter
-  const handlePhotosCaptured = (photos: string[]) => {
-    // Automatically map 1:1 photos to slots
+  const handlePhotosCaptured = (
+    photos: string[],
+    boomerangClips?: string[],
+    slotBoomerangConfig?: Record<number, boolean>
+  ) => {
+    // Strictly map 1:1 photos to slots in exact sequential order (Slot 0 -> Photo 0, Slot 1 -> Photo 1, etc.)
     const initialAssignments: { [slotIndex: number]: string } = {};
-    activeLayout.slots.forEach((slot, i) => {
-      const slotKey = slot.index ?? i;
-      if (photos[i]) {
-        initialAssignments[slotKey] = photos[i];
+    activeLayout.slots.forEach((_, i) => {
+      if (photos[i] !== undefined) {
+        initialAssignments[i] = photos[i];
       } else if (photos.length > 0) {
-        initialAssignments[slotKey] = photos[i % photos.length];
+        initialAssignments[i] = photos[i % photos.length];
       }
     });
+
+    const slotBoomerangsMap: { [slotIndex: number]: string } = {};
+    if (boomerangClips) {
+      boomerangClips.forEach((clip, idx) => {
+        if (clip) {
+          slotBoomerangsMap[idx] = clip;
+        }
+      });
+    }
+
+    const hasAnyBoomerang = boomerangClips ? boomerangClips.some(Boolean) : false;
 
     setSession((prev) => ({
       ...prev,
       fotoOriginal: photos[0] || '',
       capturedPhotos: photos,
+      boomerangEnabled: hasAnyBoomerang,
+      slotBoomerangConfig: slotBoomerangConfig || {},
+      boomerangClips: boomerangClips || [],
+      slotBoomerangs: slotBoomerangsMap,
+      boomerangVideoUrl: boomerangClips?.find(Boolean) || '',
       slotAssignments: initialAssignments,
+      slotAdjustments: {},
       status: 'draft',
     }));
 
@@ -495,6 +600,14 @@ export default function App() {
     }));
   };
 
+  // Step 6 & 7: Slot photo adjustments (pan & zoom)
+  const handleUpdateSlotAdjustments = (newAdjustments: SlotAdjustmentsMap) => {
+    setSession((prev) => ({
+      ...prev,
+      slotAdjustments: newAdjustments,
+    }));
+  };
+
   // Step 7: Custom decorations (texts & emojis)
   const handleUpdateDecorations = (newDecorations: CustomDecorationItem[]) => {
     setSession((prev) => ({
@@ -504,20 +617,51 @@ export default function App() {
   };
 
   // Step 8: Proceed from Locked Preview to Checkout
-  const handleProceedToCheckout = (watermarkedPhotoUrl: string) => {
+  const handleProceedToCheckout = (
+    watermarkedPhotoUrl: string,
+    chosenPackage: 'digital' | 'print' = selectedPackage
+  ) => {
     const newOrderId = generateUuid();
+    setSelectedPackage(chosenPackage);
     setSession((prev) => ({
       ...prev,
       watermarkedPhoto: watermarkedPhotoUrl,
+      selectedPackage: chosenPackage,
     }));
-    setOrder({
+
+    const isFree =
+      eventConfig.isFreeEvent === true ||
+      (eventConfig.hargaPerFoto === 0 &&
+        (eventConfig.hargaDigital ?? 0) === 0 &&
+        (eventConfig.hargaPrint ?? 0) === 0);
+
+    const price = isFree
+      ? 0
+      : chosenPackage === 'digital'
+      ? eventConfig.hargaDigital ?? 10000
+      : eventConfig.hargaPrint ?? eventConfig.hargaPerFoto ?? 25000;
+
+    const newOrder: PhotoboothOrder = {
       id: newOrderId,
       sessionId: session.id,
-      harga: eventConfig.hargaPerFoto,
-      statusPembayaran: 'pending',
+      harga: price,
+      statusPembayaran: isFree || price === 0 ? 'success' : 'pending',
+      paymentMethod: isFree || price === 0 ? 'Gratis Event' : undefined,
       waktuCheckout: new Date().toISOString(),
-    });
-    setCurrentStep('checkout');
+      selectedPackage: chosenPackage,
+    };
+    setOrder(newOrder);
+
+    // Jika event gratis (Rp 0), langsung arahkan ke Step 10 Final (Cetak & Download)
+    if (isFree || price === 0) {
+      setSession((prev) => ({
+        ...prev,
+        status: 'paid',
+      }));
+      setCurrentStep('final');
+    } else {
+      setCurrentStep('checkout');
+    }
   };
 
   // Step 9: Payment Success -> Step 10 Final
@@ -589,6 +733,8 @@ export default function App() {
               onStart={handleStartFromInfo}
               onOpenAdmin={handleOpenAdmin}
               onOpenLegal={handleOpenLegal}
+              selectedPackage={selectedPackage}
+              onSelectPackage={setSelectedPackage}
             />
           )}
 
@@ -632,6 +778,7 @@ export default function App() {
               layout={activeLayout}
               onPhotosCaptured={handlePhotosCaptured}
               onBack={() => setCurrentStep('layout-select')}
+              initialBoomerangEnabled={eventConfig.boomerangEnabled ?? true}
             />
           )}
 
@@ -646,20 +793,23 @@ export default function App() {
             />
           )}
 
-          {/* STEP 6: Penataan ke Slot (1:1 persis & swap) */}
+          {/* STEP 6: Penataan ke Slot (1:1 persis, geser pan & zoom, serta swap) */}
           {currentStep === 'slotting' && (
             <Step6Slotting
               photos={session.capturedPhotos}
               layout={activeLayout}
               filter={activeFilter}
+              frameUrl={activeFramePngUrl}
               slotAssignments={session.slotAssignments}
               onUpdateSlotAssignments={handleUpdateSlotAssignments}
+              slotAdjustments={session.slotAdjustments || {}}
+              onUpdateSlotAdjustments={handleUpdateSlotAdjustments}
               onNext={() => setCurrentStep('overlay')}
               onBack={() => setCurrentStep('filter')}
             />
           )}
 
-          {/* STEP 7: Overlay Frame (PNG layer paling atas & Kustom Teks/Emoji) */}
+          {/* STEP 7: Overlay Frame (PNG layer paling atas & Kustom Teks/Emoji & Pas-kan Foto) */}
           {currentStep === 'overlay' && (
             <Step7Overlay
               photos={session.capturedPhotos}
@@ -670,6 +820,8 @@ export default function App() {
               filter={activeFilter}
               decorations={session.decorations || []}
               onUpdateDecorations={handleUpdateDecorations}
+              slotAdjustments={session.slotAdjustments || {}}
+              onUpdateSlotAdjustments={handleUpdateSlotAdjustments}
               onNext={() => setCurrentStep('preview-locked')}
               onBack={() => setCurrentStep('slotting')}
             />
@@ -680,11 +832,19 @@ export default function App() {
             <Step8PreviewLocked
               photos={session.capturedPhotos}
               slotAssignments={session.slotAssignments}
+              slotAdjustments={session.slotAdjustments || {}}
               layout={activeLayout}
               frameUrl={activeFramePngUrl}
               filter={activeFilter}
-              price={eventConfig.hargaPerFoto}
+              price={
+                selectedPackage === 'digital'
+                  ? eventConfig.hargaDigital ?? 10000
+                  : eventConfig.hargaPrint ?? eventConfig.hargaPerFoto ?? 25000
+              }
               decorations={session.decorations || []}
+              eventConfig={eventConfig}
+              selectedPackage={selectedPackage}
+              onSelectPackage={setSelectedPackage}
               onProceedToCheckout={handleProceedToCheckout}
               onBack={() => setCurrentStep('overlay')}
             />
@@ -713,6 +873,7 @@ export default function App() {
               filter={activeFilter}
               layout={activeLayout}
               frameUrl={activeFramePngUrl}
+              eventConfig={eventConfig}
               onRestart={handleResetSession}
             />
           )}

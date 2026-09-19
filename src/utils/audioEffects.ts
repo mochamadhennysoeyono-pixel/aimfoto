@@ -106,3 +106,26 @@ export function playSuccessChime() {
     osc.stop(startTime + 0.35);
   });
 }
+
+export function playBoomerangWhoosh() {
+  const ctx = getAudioContext();
+  if (!ctx) return;
+
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  const now = ctx.currentTime;
+
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(260, now);
+  osc.frequency.exponentialRampToValueAtTime(800, now + 0.12);
+  osc.frequency.exponentialRampToValueAtTime(320, now + 0.28);
+
+  gain.gain.setValueAtTime(0.25, now);
+  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+
+  osc.start(now);
+  osc.stop(now + 0.3);
+}

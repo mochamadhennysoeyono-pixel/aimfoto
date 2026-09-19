@@ -97,6 +97,74 @@ export async function uploadFinalPhotoToStorage(
 }
 
 /**
+ * Upload video Boomerang soft file ke Supabase Storage (Bucket 'photos')
+ */
+export async function uploadBoomerangToStorage(
+  sessionId: string,
+  videoUrlOrBlob: string | Blob,
+  slotIndex?: number
+): Promise<{ success: boolean; publicUrl?: string; error?: string }> {
+  try {
+    if (!videoUrlOrBlob) {
+      return { success: false, error: 'Data video boomerang kosong' };
+    }
+
+    let blob: Blob;
+    let contentType = 'video/mp4';
+
+    if (typeof videoUrlOrBlob === 'string') {
+      if (videoUrlOrBlob.startsWith('data:')) {
+        blob = dataUrlToBlob(videoUrlOrBlob);
+        contentType = blob.type || 'video/mp4';
+      } else if (videoUrlOrBlob.startsWith('blob:')) {
+        const res = await fetch(videoUrlOrBlob);
+        blob = await res.blob();
+        contentType = blob.type || 'video/mp4';
+      } else {
+        // Sudah URL publik
+        return { success: true, publicUrl: videoUrlOrBlob };
+      }
+    } else {
+      blob = videoUrlOrBlob;
+      contentType = blob.type || 'video/mp4';
+    }
+
+    const ext = contentType.includes('webm') ? 'webm' : 'mp4';
+    const suffix = slotIndex !== undefined ? `_slot_${slotIndex + 1}` : '';
+    const fileName = `sessions/${sessionId}_boomerang${suffix}.${ext}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('photos')
+      .upload(fileName, blob, {
+        contentType,
+        upsert: true,
+      });
+
+    if (uploadError) {
+      console.warn('Supabase boomerang upload error:', uploadError.message);
+      return { success: false, error: uploadError.message };
+    }
+
+    const { data: publicUrlData } = supabase.storage
+      .from('photos')
+      .getPublicUrl(fileName);
+
+    const publicUrl = publicUrlData?.publicUrl;
+
+    return {
+      success: true,
+      publicUrl,
+    };
+  } catch (err: any) {
+    console.warn('Boomerang storage upload error:', err);
+    return {
+      success: false,
+      error: err?.message || 'Gagal mengunggah video boomerang ke storage',
+    };
+  }
+}
+
+/**
  * Hapus file foto dari Supabase Storage (Bucket 'photos') untuk sesi tertentu.
  */
 export async function deleteSessionPhotoFromStorage(

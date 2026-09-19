@@ -19,6 +19,11 @@ import {
   Star,
   Edit2,
   MapPin,
+  Banknote,
+  Gift,
+  Tag,
+  Smartphone,
+  Printer,
 } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import { generateUuid } from '../utils/uuid';
@@ -33,6 +38,11 @@ export interface AdminEventItem {
   is_active?: boolean;
   is_default?: boolean;
   created_at?: string;
+  is_free_event?: boolean;
+  harga_digital?: number;
+  harga_print?: number;
+  promo_badge?: string;
+  promo_description?: string;
 }
 
 interface AdminEventsProps {
@@ -76,6 +86,11 @@ export const AdminEvents: React.FC<AdminEventsProps> = ({
   const [formQrCode, setFormQrCode] = useState('');
   const [formLokasi, setFormLokasi] = useState('');
   const [formDefaultPrice, setFormDefaultPrice] = useState('10000');
+  const [formIsFreeEvent, setFormIsFreeEvent] = useState(false);
+  const [formHargaDigital, setFormHargaDigital] = useState('10000');
+  const [formHargaPrint, setFormHargaPrint] = useState('25000');
+  const [formPromoBadge, setFormPromoBadge] = useState('');
+  const [formPromoDescription, setFormPromoDescription] = useState('');
   const [formIsActive, setFormIsActive] = useState(true);
   const [formIsDefault, setFormIsDefault] = useState(false);
   const [createdEventLink, setCreatedEventLink] = useState<{ name: string; link: string } | null>(null);
@@ -86,6 +101,11 @@ export const AdminEvents: React.FC<AdminEventsProps> = ({
   const [editQrCode, setEditQrCode] = useState('');
   const [editLokasi, setEditLokasi] = useState('');
   const [editDefaultPrice, setEditDefaultPrice] = useState('10000');
+  const [editIsFreeEvent, setEditIsFreeEvent] = useState(false);
+  const [editHargaDigital, setEditHargaDigital] = useState('10000');
+  const [editHargaPrint, setEditHargaPrint] = useState('25000');
+  const [editPromoBadge, setEditPromoBadge] = useState('');
+  const [editPromoDescription, setEditPromoDescription] = useState('');
   const [editIsActive, setEditIsActive] = useState(true);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
 
@@ -118,10 +138,19 @@ export const AdminEvents: React.FC<AdminEventsProps> = ({
             ev.id !== '11111111-2222-3333-4444-555555555555' &&
             ev.id !== '00000000-0000-0000-0000-000000000001' &&
             !ev.qr_code?.startsWith('__')
-        ).map((ev) => ({
-          ...ev,
-          lokasi: metaMap[ev.id]?.lokasi || (ev as any).lokasi || '',
-        }));
+        ).map((ev) => {
+          const meta = metaMap[ev.id] || {};
+          const isFree = meta.isFreeEvent ?? (ev.default_price === 0);
+          return {
+            ...ev,
+            lokasi: meta.lokasi || (ev as any).lokasi || '',
+            is_free_event: isFree,
+            harga_digital: meta.hargaDigital !== undefined ? meta.hargaDigital : (isFree ? 0 : 10000),
+            harga_print: meta.hargaPrint !== undefined ? meta.hargaPrint : (isFree ? 0 : (ev.default_price || 25000)),
+            promo_badge: meta.promoBadge || '',
+            promo_description: meta.promoDescription || '',
+          };
+        });
 
         setEvents(cleanedData);
         // Cari event yang memiliki is_default = true di Supabase
@@ -215,12 +244,18 @@ export const AdminEvents: React.FC<AdminEventsProps> = ({
           setErrorMsg(`Gagal menambah event: ${error.message}`);
         }
       } else {
-        // Simpan metadata lokasi jika diisi
-        if (formLokasi.trim()) {
-          await saveEventMetadata(newId, {
-            lokasi: formLokasi.trim(),
-          });
-        }
+        const parsedDigital = formIsFreeEvent ? 0 : (parseInt(formHargaDigital, 10) || 0);
+        const parsedPrint = formIsFreeEvent ? 0 : (parseInt(formHargaPrint, 10) || 0);
+
+        // Simpan metadata lokasi, tarif paket, dan promo
+        await saveEventMetadata(newId, {
+          lokasi: formLokasi.trim(),
+          isFreeEvent: formIsFreeEvent,
+          hargaDigital: parsedDigital,
+          hargaPrint: parsedPrint,
+          promoBadge: formPromoBadge.trim(),
+          promoDescription: formPromoDescription.trim(),
+        });
 
         // Jika dicentang sebagai default event
         if (formIsDefault) {
@@ -235,6 +270,11 @@ export const AdminEvents: React.FC<AdminEventsProps> = ({
                 nama: formName.trim(),
                 lokasi: formLokasi.trim() || 'Photobooth Station',
                 hargaPerFoto: parsedPrice,
+                isFreeEvent: formIsFreeEvent,
+                hargaDigital: parsedDigital,
+                hargaPrint: parsedPrint,
+                promoBadge: formPromoBadge.trim(),
+                promoDescription: formPromoDescription.trim(),
               })
             );
             // Coba un-default event lain di Supabase jika kolom is_default ada
@@ -323,9 +363,17 @@ export const AdminEvents: React.FC<AdminEventsProps> = ({
 
       if (error) throw error;
 
-      // Simpan metadata lokasi ke row __EVENTS_META__
+      const parsedDigital = editIsFreeEvent ? 0 : (parseInt(editHargaDigital, 10) || 0);
+      const parsedPrint = editIsFreeEvent ? 0 : (parseInt(editHargaPrint, 10) || 0);
+
+      // Simpan metadata lokasi, tarif paket, dan promo ke row __EVENTS_META__
       await saveEventMetadata(editingEvent.id, {
         lokasi: editLokasi.trim(),
+        isFreeEvent: editIsFreeEvent,
+        hargaDigital: parsedDigital,
+        hargaPrint: parsedPrint,
+        promoBadge: editPromoBadge.trim(),
+        promoDescription: editPromoDescription.trim(),
       });
 
       // Update state event di tabel
@@ -339,6 +387,11 @@ export const AdminEvents: React.FC<AdminEventsProps> = ({
                 lokasi: editLokasi.trim(),
                 default_price: parsedPrice,
                 is_active: editIsActive,
+                is_free_event: editIsFreeEvent,
+                harga_digital: parsedDigital,
+                harga_print: parsedPrint,
+                promo_badge: editPromoBadge.trim(),
+                promo_description: editPromoDescription.trim(),
               }
             : ev
         )
@@ -373,6 +426,11 @@ export const AdminEvents: React.FC<AdminEventsProps> = ({
               nama: editName.trim(),
               lokasi: editLokasi.trim() || 'AIM SPACE Studio',
               hargaPerFoto: parsedPrice,
+              isFreeEvent: editIsFreeEvent,
+              hargaDigital: parsedDigital,
+              hargaPrint: parsedPrint,
+              promoBadge: editPromoBadge.trim(),
+              promoDescription: editPromoDescription.trim(),
             })
           );
         }
@@ -384,6 +442,23 @@ export const AdminEvents: React.FC<AdminEventsProps> = ({
               price: parsedPrice,
               name: editName.trim(),
               lokasi: editLokasi.trim(),
+              isFreeEvent: editIsFreeEvent,
+              hargaDigital: parsedDigital,
+              hargaPrint: parsedPrint,
+              promoBadge: editPromoBadge.trim(),
+              promoDescription: editPromoDescription.trim(),
+            },
+          })
+        );
+        window.dispatchEvent(
+          new CustomEvent('photobooth-event-config-updated', {
+            detail: {
+              id: editingEvent.id,
+              isFreeEvent: editIsFreeEvent,
+              hargaDigital: parsedDigital,
+              hargaPrint: parsedPrint,
+              promoBadge: editPromoBadge.trim(),
+              promoDescription: editPromoDescription.trim(),
             },
           })
         );
@@ -716,19 +791,98 @@ export const AdminEvents: React.FC<AdminEventsProps> = ({
               </p>
             </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-zinc-300 mb-1">
-                Harga Per Sesi (IDR)
-              </label>
-              <input
-                type="number"
-                min="0"
-                step="1000"
-                value={formDefaultPrice}
-                onChange={(e) => setFormDefaultPrice(e.target.value)}
-                placeholder="10000"
-                className="w-full px-3 py-2 rounded-xl bg-zinc-950 border border-zinc-800 text-xs text-white font-mono placeholder-zinc-600 focus:outline-none focus:border-amber-500"
-              />
+            {/* Pengaturan Harga & Paket */}
+            <div className="sm:col-span-2 p-3.5 rounded-xl bg-zinc-900/60 border border-zinc-800 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                  <Banknote className="w-3.5 h-3.5 text-amber-400" />
+                  Tarif Paket & Promo Khusus Event Ini
+                </span>
+                <label className="flex items-center gap-2 text-xs text-emerald-400 font-semibold cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formIsFreeEvent}
+                    onChange={(e) => {
+                      setFormIsFreeEvent(e.target.checked);
+                      if (e.target.checked) setFormDefaultPrice('0');
+                    }}
+                    className="w-4 h-4 rounded text-emerald-500 bg-zinc-950 border-zinc-700 focus:ring-emerald-500 cursor-pointer"
+                  />
+                  <span>Event Gratis (Rp 0)</span>
+                </label>
+              </div>
+
+              {!formIsFreeEvent ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                  <div>
+                    <label className="block text-[11px] font-medium text-cyan-300 mb-1 flex items-center gap-1">
+                      <Smartphone className="w-3 h-3" />
+                      Harga Paket Digital Softfile (IDR)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1000"
+                      value={formHargaDigital}
+                      onChange={(e) => setFormHargaDigital(e.target.value)}
+                      placeholder="10000"
+                      className="w-full px-3 py-2 rounded-xl bg-zinc-950 border border-zinc-800 text-xs text-white font-mono placeholder-zinc-600 focus:outline-none focus:border-cyan-400"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-medium text-amber-300 mb-1 flex items-center gap-1">
+                      <Printer className="w-3 h-3" />
+                      Harga Paket Cetak Fisik + HD (IDR)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1000"
+                      value={formHargaPrint}
+                      onChange={(e) => {
+                        setFormHargaPrint(e.target.value);
+                        setFormDefaultPrice(e.target.value);
+                      }}
+                      placeholder="25000"
+                      className="w-full px-3 py-2 rounded-xl bg-zinc-950 border border-zinc-800 text-xs text-white font-mono placeholder-zinc-600 focus:outline-none focus:border-amber-400"
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-[11px] text-emerald-300 flex items-center gap-2">
+                  <Gift className="w-4 h-4 shrink-0" />
+                  <span>Mode Gratis Aktif: Tamu dapat langsung foto dan unduh/cetak tanpa ditagih pembayaran kasir.</span>
+                </div>
+              )}
+
+              {/* Promo Fields */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 border-t border-zinc-800/80">
+                <div>
+                  <label className="block text-[11px] font-medium text-zinc-300 mb-1 flex items-center gap-1">
+                    <Tag className="w-3 h-3 text-amber-400" />
+                    Badge Promo (Opsional)
+                  </label>
+                  <input
+                    type="text"
+                    value={formPromoBadge}
+                    onChange={(e) => setFormPromoBadge(e.target.value)}
+                    placeholder="Contoh: Promo Hajatan / Grand Opening"
+                    className="w-full px-3 py-2 rounded-xl bg-zinc-950 border border-zinc-800 text-xs text-white placeholder-zinc-600 focus:outline-none focus:border-amber-400"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-medium text-zinc-300 mb-1">
+                    Deskripsi Promo (Opsional)
+                  </label>
+                  <input
+                    type="text"
+                    value={formPromoDescription}
+                    onChange={(e) => setFormPromoDescription(e.target.value)}
+                    placeholder="Contoh: Dapatkan gratis softfile HD untuk setiap sesi!"
+                    className="w-full px-3 py-2 rounded-xl bg-zinc-950 border border-zinc-800 text-xs text-white placeholder-zinc-600 focus:outline-none focus:border-amber-400"
+                  />
+                </div>
+              </div>
             </div>
 
             <div>
@@ -838,7 +992,7 @@ export const AdminEvents: React.FC<AdminEventsProps> = ({
               <tr>
                 <th className="py-3 px-4">Nama Event</th>
                 <th className="py-3 px-4">Kode QR & Link</th>
-                <th className="py-3 px-4">Harga Per Sesi</th>
+                <th className="py-3 px-4">Tarif Paket & Promo</th>
                 <th className="py-3 px-4 text-center">Status</th>
                 <th className="py-3 px-4">Tanggal Dibuat</th>
                 <th className="py-3 px-4 text-right">Aksi</th>
@@ -933,9 +1087,39 @@ export const AdminEvents: React.FC<AdminEventsProps> = ({
                         </span>
                       </td>
 
-                      {/* Default Price */}
-                      <td className="py-3.5 px-4 font-mono text-zinc-300">
-                        {formattedPrice}
+                      {/* Tarif Paket & Promo */}
+                      <td className="py-3.5 px-4 text-xs">
+                        {ev.is_free_event || ev.default_price === 0 ? (
+                          <div className="space-y-1">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold">
+                              <Gift className="w-3 h-3" />
+                              <span>Gratis (Rp 0)</span>
+                            </span>
+                            {ev.promo_badge && (
+                              <div className="text-[10px] text-amber-300 flex items-center gap-1 font-sans">
+                                <Tag className="w-2.5 h-2.5 text-amber-400 shrink-0" />
+                                <span className="truncate max-w-[130px]">{ev.promo_badge}</span>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="space-y-1 text-[11px] font-mono">
+                            <div className="flex items-center gap-1.5 text-cyan-300">
+                              <Smartphone className="w-3 h-3 shrink-0 text-cyan-400" />
+                              <span>Digital: Rp {(ev.harga_digital ?? 10000).toLocaleString('id-ID')}</span>
+                            </div>
+                            <div className="flex items-center gap-1.5 text-amber-300">
+                              <Printer className="w-3 h-3 shrink-0 text-amber-400" />
+                              <span>Cetak: Rp {(ev.harga_print ?? ev.default_price ?? 25000).toLocaleString('id-ID')}</span>
+                            </div>
+                            {ev.promo_badge && (
+                              <div className="text-[10px] text-zinc-300 flex items-center gap-1 font-sans font-medium bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded">
+                                <Tag className="w-2.5 h-2.5 text-amber-400 shrink-0" />
+                                <span className="truncate max-w-[120px]">{ev.promo_badge}</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </td>
 
                       {/* Active Toggle Switch */}
@@ -993,7 +1177,7 @@ export const AdminEvents: React.FC<AdminEventsProps> = ({
                             </button>
                           )}
 
-                          {/* Tombol Edit Event */}
+                          {/* Tombol Edit Event & Tarif */}
                           <button
                             onClick={() => {
                               setEditingEvent(ev);
@@ -1001,10 +1185,15 @@ export const AdminEvents: React.FC<AdminEventsProps> = ({
                               setEditQrCode(ev.qr_code);
                               setEditLokasi(ev.lokasi || '');
                               setEditDefaultPrice(String(ev.default_price ?? 10000));
+                              setEditIsFreeEvent(Boolean(ev.is_free_event || ev.default_price === 0));
+                              setEditHargaDigital(String(ev.harga_digital ?? 10000));
+                              setEditHargaPrint(String(ev.harga_print ?? ev.default_price ?? 25000));
+                              setEditPromoBadge(ev.promo_badge || '');
+                              setEditPromoDescription(ev.promo_description || '');
                               setEditIsActive(ev.is_active ?? true);
                             }}
                             className="p-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white border border-zinc-800 transition-colors cursor-pointer"
-                            title="Edit Event & Harga Sesi"
+                            title="Edit Event, Tarif Paket & Promo"
                           >
                             <Edit2 className="w-3.5 h-3.5" />
                           </button>
@@ -1039,61 +1228,147 @@ export const AdminEvents: React.FC<AdminEventsProps> = ({
 
       {/* Edit Event Modal */}
       {editingEvent && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-md bg-[#0f121a] border border-zinc-800 rounded-2xl p-5 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150">
-            <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-hidden">
+          <div className="w-full max-w-lg bg-[#0f121a] border border-zinc-800 rounded-2xl shadow-2xl flex flex-col max-h-[85vh] sm:max-h-[82vh] overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            {/* Modal Header (Fixed at top) */}
+            <div className="px-4 sm:px-5 py-3 border-b border-zinc-800 flex items-center justify-between shrink-0 bg-[#0f121a]">
               <h3 className="text-sm font-bold text-white flex items-center gap-2">
                 <Edit2 className="w-4 h-4 text-amber-400" />
-                <span>Edit Event & Harga Sesi</span>
+                <span>Edit Event, Tarif Paket & Promo</span>
               </h3>
               <button
                 onClick={() => setEditingEvent(null)}
                 disabled={isSavingEdit}
-                className="text-zinc-500 hover:text-zinc-300 disabled:opacity-50 cursor-pointer"
+                className="text-zinc-500 hover:text-zinc-300 disabled:opacity-50 cursor-pointer p-1 rounded-lg hover:bg-zinc-800/60 transition-colors"
+                title="Tutup"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleSaveEditEvent} className="space-y-3.5 text-xs">
-              <div>
-                <label className="block text-zinc-400 font-medium mb-1">Nama Event *</label>
-                <input
-                  type="text"
-                  value={editName}
-                  onChange={(e) => setEditName(e.target.value)}
-                  required
-                  className="w-full px-3 py-2 rounded-xl bg-zinc-950 border border-zinc-800 text-white focus:outline-none focus:border-amber-500"
-                />
+            {/* Scrollable Form Body */}
+            <form
+              id="edit-event-form"
+              onSubmit={handleSaveEditEvent}
+              className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3 text-xs overscroll-contain"
+            >
+              {/* Row 1: Nama Event & Kode QR Slug berdampingan agar lebih pendek */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-zinc-400 font-medium mb-1">Nama Event *</label>
+                  <input
+                    type="text"
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    required
+                    className="w-full px-3 py-1.5 rounded-xl bg-zinc-950 border border-zinc-800 text-white focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-zinc-400 font-medium mb-1">Kode QR / Slug URL *</label>
+                  <input
+                    type="text"
+                    value={editQrCode}
+                    onChange={(e) => setEditQrCode(e.target.value)}
+                    required
+                    className="w-full px-3 py-1.5 rounded-xl bg-zinc-950 border border-zinc-800 text-white font-mono focus:outline-none focus:border-amber-500"
+                  />
+                </div>
               </div>
 
-              <div>
-                <label className="block text-zinc-400 font-medium mb-1">Kode QR / Slug URL *</label>
-                <input
-                  type="text"
-                  value={editQrCode}
-                  onChange={(e) => setEditQrCode(e.target.value)}
-                  required
-                  className="w-full px-3 py-2 rounded-xl bg-zinc-950 border border-zinc-800 text-white font-mono focus:outline-none focus:border-amber-500"
-                />
-              </div>
+              {/* Pengaturan Harga, Paket & Promo */}
+              <div className="p-3 rounded-xl bg-zinc-900/60 border border-zinc-800 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                    <Banknote className="w-3.5 h-3.5 text-amber-400" />
+                    Tarif Paket & Promo Khusus Event
+                  </span>
+                  <label className="flex items-center gap-2 text-xs text-emerald-400 font-semibold cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={editIsFreeEvent}
+                      onChange={(e) => {
+                        setEditIsFreeEvent(e.target.checked);
+                        if (e.target.checked) setEditDefaultPrice('0');
+                      }}
+                      className="w-4 h-4 rounded text-emerald-500 bg-zinc-950 border-zinc-700 focus:ring-emerald-500 cursor-pointer"
+                    />
+                    <span>Event Gratis (Rp 0)</span>
+                  </label>
+                </div>
 
-              <div>
-                <label className="block text-zinc-400 font-medium mb-1">
-                  Harga Per Sesi (IDR) *
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="1000"
-                  value={editDefaultPrice}
-                  onChange={(e) => setEditDefaultPrice(e.target.value)}
-                  required
-                  className="w-full px-3 py-2 rounded-xl bg-zinc-950 border border-zinc-800 text-white font-mono focus:outline-none focus:border-amber-500"
-                />
-                <p className="text-[11px] text-zinc-500 mt-1">
-                  Harga ini otomatis menjadi tarif sesi yang muncul di kiosk publik dan halaman checkout.
-                </p>
+                {!editIsFreeEvent ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-0.5">
+                    <div>
+                      <label className="block text-[11px] font-medium text-cyan-300 mb-1 flex items-center gap-1">
+                        <Smartphone className="w-3 h-3" />
+                        Harga Paket Digital Softfile (IDR)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="1000"
+                        value={editHargaDigital}
+                        onChange={(e) => setEditHargaDigital(e.target.value)}
+                        placeholder="10000"
+                        className="w-full px-3 py-1.5 rounded-xl bg-zinc-950 border border-zinc-800 text-white font-mono focus:outline-none focus:border-cyan-400"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-medium text-amber-300 mb-1 flex items-center gap-1">
+                        <Printer className="w-3 h-3" />
+                        Harga Paket Cetak Fisik + HD (IDR)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="1000"
+                        value={editHargaPrint}
+                        onChange={(e) => {
+                          setEditHargaPrint(e.target.value);
+                          setEditDefaultPrice(e.target.value);
+                        }}
+                        placeholder="25000"
+                        className="w-full px-3 py-1.5 rounded-xl bg-zinc-950 border border-zinc-800 text-white font-mono focus:outline-none focus:border-amber-400"
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-[11px] text-emerald-300 flex items-center gap-2">
+                    <Gift className="w-4 h-4 shrink-0" />
+                    <span>Mode Gratis Aktif: Tamu dapat langsung foto dan unduh/cetak tanpa tagihan kasir.</span>
+                  </div>
+                )}
+
+                {/* Promo Fields */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2 border-t border-zinc-800/80">
+                  <div>
+                    <label className="block text-[11px] font-medium text-zinc-300 mb-1 flex items-center gap-1">
+                      <Tag className="w-3 h-3 text-amber-400" />
+                      Badge Promo
+                    </label>
+                    <input
+                      type="text"
+                      value={editPromoBadge}
+                      onChange={(e) => setEditPromoBadge(e.target.value)}
+                      placeholder="Contoh: Promo Spesial Event"
+                      className="w-full px-3 py-1.5 rounded-xl bg-zinc-950 border border-zinc-800 text-white placeholder-zinc-600 focus:outline-none focus:border-amber-400"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-medium text-zinc-300 mb-1">
+                      Deskripsi Promo
+                    </label>
+                    <input
+                      type="text"
+                      value={editPromoDescription}
+                      onChange={(e) => setEditPromoDescription(e.target.value)}
+                      placeholder="Contoh: Gratis cetak frame ke-2!"
+                      className="w-full px-3 py-1.5 rounded-xl bg-zinc-950 border border-zinc-800 text-white placeholder-zinc-600 focus:outline-none focus:border-amber-400"
+                    />
+                  </div>
+                </div>
               </div>
 
               <div>
@@ -1106,16 +1381,16 @@ export const AdminEvents: React.FC<AdminEventsProps> = ({
                     value={editLokasi}
                     onChange={(e) => setEditLokasi(e.target.value)}
                     placeholder="Contoh: AIM SPACE Studio / Ballroom Lt. 2"
-                    className="w-full pl-8 pr-3 py-2 rounded-xl bg-zinc-950 border border-zinc-800 text-white placeholder-zinc-600 focus:outline-none focus:border-amber-500"
+                    className="w-full pl-8 pr-3 py-1.5 rounded-xl bg-zinc-950 border border-zinc-800 text-white placeholder-zinc-600 focus:outline-none focus:border-amber-500"
                   />
                   <MapPin className="w-3.5 h-3.5 text-zinc-500 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                 </div>
-                <p className="text-[11px] text-zinc-500 mt-1">
+                <p className="text-[10px] text-zinc-500 mt-0.5">
                   Lokasi ini akan langsung tampil di kolom &quot;Lokasi&quot; pada halaman utama publik / kiosk.
                 </p>
               </div>
 
-              <div className="flex items-center gap-2 pt-1">
+              <div className="flex items-center gap-2 pt-0.5">
                 <label className="flex items-center gap-2 text-zinc-300 cursor-pointer">
                   <input
                     type="checkbox"
@@ -1126,43 +1401,45 @@ export const AdminEvents: React.FC<AdminEventsProps> = ({
                   <span>Event aktif (dapat diakses tamu)</span>
                 </label>
               </div>
-
-              <div className="flex justify-end gap-2 pt-3 border-t border-zinc-800">
-                <button
-                  type="button"
-                  onClick={() => setEditingEvent(null)}
-                  disabled={isSavingEdit}
-                  className="py-2 px-3.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-400 text-xs font-semibold disabled:opacity-50 transition-colors cursor-pointer"
-                >
-                  Batal
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSavingEdit}
-                  className="py-2 px-4 rounded-xl bg-amber-500 hover:bg-amber-400 text-zinc-950 text-xs font-bold flex items-center gap-1.5 shadow-md shadow-amber-500/20 disabled:opacity-50 transition-all cursor-pointer"
-                >
-                  {isSavingEdit ? (
-                    <>
-                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                      <span>Menyimpan...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Check className="w-3.5 h-3.5" />
-                      <span>Simpan Perubahan</span>
-                    </>
-                  )}
-                </button>
-              </div>
             </form>
+
+            {/* Modal Footer (Pinned/Fixed at bottom) */}
+            <div className="px-4 sm:px-5 py-3 border-t border-zinc-800 flex justify-end gap-2 bg-[#0f121a] shrink-0">
+              <button
+                type="button"
+                onClick={() => setEditingEvent(null)}
+                disabled={isSavingEdit}
+                className="py-2 px-3.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-400 text-xs font-semibold disabled:opacity-50 transition-colors cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="submit"
+                form="edit-event-form"
+                disabled={isSavingEdit}
+                className="py-2 px-4 rounded-xl bg-amber-500 hover:bg-amber-400 text-zinc-950 text-xs font-bold flex items-center gap-1.5 shadow-md shadow-amber-500/20 disabled:opacity-50 transition-all cursor-pointer"
+              >
+                {isSavingEdit ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Menyimpan...</span>
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-3.5 h-3.5" />
+                    <span>Simpan Perubahan</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}
 
       {/* Delete Confirmation Modal (In-App, safe for iframes) */}
       {eventToDelete && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-sm bg-[#0f121a] border border-rose-500/30 rounded-2xl p-5 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-hidden">
+          <div className="w-full max-w-sm bg-[#0f121a] border border-rose-500/30 rounded-2xl p-5 shadow-2xl space-y-4 max-h-[85vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between pb-2 border-b border-zinc-800">
               <h3 className="text-sm font-bold text-white flex items-center gap-2">
                 <Trash2 className="w-4 h-4 text-rose-400" />
@@ -1232,9 +1509,9 @@ export const AdminEvents: React.FC<AdminEventsProps> = ({
 
       {/* Modal Panduan Supabase RLS Saat Penghapusan Diblokir */}
       {rlsBlockedEvent && (
-        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-lg bg-zinc-900 border border-amber-500/40 rounded-2xl p-5 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150">
-            <div className="flex items-start justify-between gap-3 border-b border-zinc-800 pb-3">
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-hidden">
+          <div className="w-full max-w-lg bg-zinc-900 border border-amber-500/40 rounded-2xl shadow-2xl flex flex-col max-h-[85vh] overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-start justify-between gap-3 border-b border-zinc-800 p-4 sm:p-5 shrink-0 bg-zinc-900">
               <div className="flex items-center gap-2.5">
                 <div className="p-2 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30">
                   <AlertCircle className="w-5 h-5" />
@@ -1256,64 +1533,66 @@ export const AdminEvents: React.FC<AdminEventsProps> = ({
               </button>
             </div>
 
-            <div className="p-3.5 rounded-xl bg-zinc-950 border border-zinc-800 space-y-1.5">
-              <p className="text-xs text-zinc-300">
-                Event yang ingin dihapus:{' '}
-                <span className="font-bold text-white">{rlsBlockedEvent.name}</span>{' '}
-                <span className="font-mono text-amber-400 text-[11px]">({rlsBlockedEvent.qr_code})</span>
-              </p>
-              <p className="text-[11px] text-zinc-400 leading-relaxed">
-                Tabel <code className="text-zinc-200 font-mono">events</code> di Supabase mengaktifkan RLS dan belum memiliki hak izin operasi <code className="text-amber-400 font-mono">DELETE</code> untuk public/anon. Oleh karena itu, Supabase menolak penghapusan baris dan saat Anda merefresh halaman, data tersebut ditarik kembali.
-              </p>
-            </div>
-
-            {/* Kotak SQL Query untuk Dijalankan di Supabase */}
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-zinc-300 flex items-center gap-1.5">
-                  <Database className="w-3.5 h-3.5 text-amber-400" />
-                  Solusi Permanen (Jalankan 1x di Supabase SQL Editor):
-                </span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const sql = `ALTER TABLE events DISABLE ROW LEVEL SECURITY;\nALTER TABLE frames DISABLE ROW LEVEL SECURITY;`;
-                    navigator.clipboard.writeText(sql);
-                    setHasCopiedSql(true);
-                    setTimeout(() => setHasCopiedSql(false), 2500);
-                  }}
-                  className="px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 text-[11px] font-semibold flex items-center gap-1 transition-colors cursor-pointer"
-                >
-                  {hasCopiedSql ? (
-                    <>
-                      <Check className="w-3 h-3 text-emerald-400" />
-                      <span>Script Tersalin!</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="w-3 h-3" />
-                      <span>Salin Query SQL</span>
-                    </>
-                  )}
-                </button>
+            <div className="p-4 sm:p-5 space-y-3.5 flex-1 overflow-y-auto">
+              <div className="p-3.5 rounded-xl bg-zinc-950 border border-zinc-800 space-y-1.5">
+                <p className="text-xs text-zinc-300">
+                  Event yang ingin dihapus:{' '}
+                  <span className="font-bold text-white">{rlsBlockedEvent.name}</span>{' '}
+                  <span className="font-mono text-amber-400 text-[11px]">({rlsBlockedEvent.qr_code})</span>
+                </p>
+                <p className="text-[11px] text-zinc-400 leading-relaxed">
+                  Tabel <code className="text-zinc-200 font-mono">events</code> di Supabase mengaktifkan RLS dan belum memiliki hak izin operasi <code className="text-amber-400 font-mono">DELETE</code> untuk public/anon. Oleh karena itu, Supabase menolak penghapusan baris dan saat Anda merefresh halaman, data tersebut ditarik kembali.
+                </p>
               </div>
 
-              <pre className="p-3 rounded-xl bg-zinc-950 border border-zinc-800 text-[11px] font-mono text-zinc-200 overflow-x-auto select-all leading-relaxed">
+              {/* Kotak SQL Query untuk Dijalankan di Supabase */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-zinc-300 flex items-center gap-1.5">
+                    <Database className="w-3.5 h-3.5 text-amber-400" />
+                    Solusi Permanen (Jalankan 1x di Supabase SQL Editor):
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const sql = `ALTER TABLE events DISABLE ROW LEVEL SECURITY;\nALTER TABLE frames DISABLE ROW LEVEL SECURITY;`;
+                      navigator.clipboard.writeText(sql);
+                      setHasCopiedSql(true);
+                      setTimeout(() => setHasCopiedSql(false), 2500);
+                    }}
+                    className="px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 text-[11px] font-semibold flex items-center gap-1 transition-colors cursor-pointer"
+                  >
+                    {hasCopiedSql ? (
+                      <>
+                        <Check className="w-3 h-3 text-emerald-400" />
+                        <span>Script Tersalin!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3 h-3" />
+                        <span>Salin Query SQL</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                <pre className="p-3 rounded-xl bg-zinc-950 border border-zinc-800 text-[11px] font-mono text-zinc-200 overflow-x-auto select-all leading-relaxed">
 {`-- Salin dan jalankan di menu SQL Editor di Supabase:
 ALTER TABLE events DISABLE ROW LEVEL SECURITY;
 ALTER TABLE frames DISABLE ROW LEVEL SECURITY;`}
-              </pre>
+                </pre>
 
-              <ol className="text-[11px] text-zinc-400 list-decimal list-inside space-y-0.5 pt-1">
-                <li>Buka dashboard Supabase project Anda</li>
-                <li>Pilih tab <strong>SQL Editor</strong> di sidebar kiri</li>
-                <li>Tempel (Paste) perintah di atas lalu klik tombol <strong>Run</strong></li>
-                <li>Setelah itu, event akan langsung terhapus permanen saat tombol hapus diklik</li>
-              </ol>
+                <ol className="text-[11px] text-zinc-400 list-decimal list-inside space-y-0.5 pt-1">
+                  <li>Buka dashboard Supabase project Anda</li>
+                  <li>Pilih tab <strong>SQL Editor</strong> di sidebar kiri</li>
+                  <li>Tempel (Paste) perintah di atas lalu klik tombol <strong>Run</strong></li>
+                  <li>Setelah itu, event akan langsung terhapus permanen saat tombol hapus diklik</li>
+                </ol>
+              </div>
             </div>
 
             {/* Tindakan Alternatif Instan */}
-            <div className="pt-2 border-t border-zinc-800 flex flex-col sm:flex-row items-center justify-between gap-2">
+            <div className="p-4 sm:p-5 border-t border-zinc-800 flex flex-col sm:flex-row items-center justify-between gap-2 shrink-0 bg-zinc-900">
               <button
                 type="button"
                 disabled={isDeactivatingInstead}

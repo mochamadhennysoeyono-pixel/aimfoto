@@ -1,4 +1,4 @@
-import { FilterPreset, FrameLayoutType, PhotoboothLayout, CustomDecorationItem } from '../types';
+import { FilterPreset, FrameLayoutType, PhotoboothLayout, CustomDecorationItem, SlotAdjustment, SlotAdjustmentsMap } from '../types';
 import { getFrameLayout } from '../data/frameLayouts';
 
 /**
@@ -14,42 +14,70 @@ export function loadImage(src: string): Promise<HTMLImageElement> {
   });
 }
 
+export type DrawableImageSource = HTMLImageElement | HTMLCanvasElement | HTMLVideoElement;
+
 /**
- * Draws an image into a bounding box with object-fit: cover
+ * Draws an image into a bounding box with object-fit: cover, respecting custom pan (X/Y) & zoom adjustments
  */
-function drawCoverImage(
+export function drawCoverImage(
   ctx: CanvasRenderingContext2D,
-  img: HTMLImageElement,
+  img: DrawableImageSource,
   x: number,
   y: number,
   w: number,
-  h: number
+  h: number,
+  adjustment?: SlotAdjustment
 ) {
+  const naturalWidth = (img as HTMLVideoElement).videoWidth || (img as HTMLImageElement).naturalWidth || img.width;
+  const naturalHeight = (img as HTMLVideoElement).videoHeight || (img as HTMLImageElement).naturalHeight || img.height;
   const targetAspect = w / h;
-  const imgAspect = img.width / img.height;
+  const imgAspect = (naturalWidth && naturalHeight) ? naturalWidth / naturalHeight : w / h;
 
-  let drawW = w;
-  let drawH = h;
-  let drawX = x;
-  let drawY = y;
+  let baseW = w;
+  let baseH = h;
 
   if (imgAspect > targetAspect) {
-    drawH = h;
-    drawW = h * imgAspect;
-    drawX = x + (w - drawW) / 2;
+    baseH = h;
+    baseW = h * imgAspect;
   } else {
-    drawW = w;
-    drawH = w / imgAspect;
-    drawY = y + (h - drawH) / 2;
+    baseW = w;
+    baseH = w / imgAspect;
   }
 
-  ctx.drawImage(img, drawX, drawY, drawW, drawH);
+  // Zoom scale (default 1.0, range 0.5 to 3.5)
+  const zoom = Math.max(0.5, Math.min(3.5, adjustment?.zoom ?? 1));
+  const panX = adjustment?.panX ?? 0; // offset in percentage of slot width (-80 to 80)
+  const panY = adjustment?.panY ?? 0; // offset in percentage of slot height (-80 to 80)
+
+  const drawW = baseW * zoom;
+  const drawH = baseH * zoom;
+
+  // Center coordinate of slot box
+  const centerX = x + w / 2;
+  const centerY = y + h / 2;
+
+  // Offsets derived from percentage
+  const offsetX = (panX / 100) * w;
+  const offsetY = (panY / 100) * h;
+
+  const drawX = centerX + offsetX - drawW / 2;
+  const drawY = centerY + offsetY - drawH / 2;
+
+  if (adjustment?.rotation) {
+    ctx.save();
+    ctx.translate(centerX + offsetX, centerY + offsetY);
+    ctx.rotate((adjustment.rotation * Math.PI) / 180);
+    ctx.drawImage(img, -drawW / 2, -drawH / 2, drawW, drawH);
+    ctx.restore();
+  } else {
+    ctx.drawImage(img, drawX, drawY, drawW, drawH);
+  }
 }
 
 /**
  * Renders user custom decorations (texts and emojis) onto the canvas with proper font styling and 3D/cartoon effects.
  */
-function drawDecorations(
+export function drawDecorations(
   ctx: CanvasRenderingContext2D,
   decorations: CustomDecorationItem[],
   canvasWidth: number,
@@ -159,6 +187,7 @@ function drawDecorations(
 export interface CompositeOptions {
   photoSrc?: string;
   slotPhotos?: { [slotIndex: number]: string };
+  slotAdjustments?: SlotAdjustmentsMap;
   layout?: PhotoboothLayout;
   layoutType?: FrameLayoutType;
   filter: FilterPreset;
@@ -169,12 +198,37 @@ export interface CompositeOptions {
   decorations?: CustomDecorationItem[];
 }
 
+export function applyVignetteToRect(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  vignette: { intensity: number; innerRadius?: number; outerRadius?: number }
+) {
+  const centerX = x + w / 2;
+  const centerY = y + h / 2;
+  const maxRadius = Math.sqrt((w / 2) ** 2 + (h / 2) ** 2);
+  const innerR = maxRadius * (vignette.innerRadius ?? 0.28);
+  const outerR = maxRadius * (vignette.outerRadius ?? 0.95);
+
+  const grad = ctx.createRadialGradient(centerX, centerY, innerR, centerX, centerY, outerR);
+  grad.addColorStop(0, 'rgba(0, 0, 0, 0)');
+  grad.addColorStop(0.45, `rgba(0, 0, 0, ${vignette.intensity * 0.35})`);
+  grad.addColorStop(0.75, `rgba(0, 0, 0, ${vignette.intensity * 0.70})`);
+  grad.addColorStop(1, `rgba(0, 0, 0, ${vignette.intensity})`);
+
+  ctx.fillStyle = grad;
+  ctx.fillRect(x, y, w, h);
+}
+
 /**
  * Composites single or multi-photo layout with chosen filter and frame overlay onto an offscreen canvas.
  */
 export async function renderCompositedPhoto({
   photoSrc,
   slotPhotos,
+  slotAdjustments,
   layout,
   layoutType,
   filter,
@@ -201,10 +255,13 @@ export async function renderCompositedPhoto({
   // 2. Render Photos into Layout Slots
   if (layout && layout.slots && layout.slots.length > 0) {
     // Modern percentage-based layout slots: pixel = (slot.% / 100) * canvas_dimension
-    for (const slot of layout.slots) {
+    for (let sIdx = 0; sIdx < layout.slots.length; sIdx++) {
+      const slot = layout.slots[sIdx];
+      const slotKey = slot.index !== undefined ? slot.index : sIdx;
+
       const currentPhotoSrc =
-        (slotPhotos && slotPhotos[slot.index]) ||
-        (slotPhotos && Object.values(slotPhotos)[slot.index % Object.keys(slotPhotos).length]) ||
+        (slotPhotos && slotPhotos[slotKey]) ||
+        (slotPhotos && slotPhotos[sIdx]) ||
         photoSrc;
 
       if (currentPhotoSrc) {
@@ -228,12 +285,20 @@ export async function renderCompositedPhoto({
           if (filter.cssFilter && filter.cssFilter !== 'none') {
             ctx.filter = filter.cssFilter;
           }
-          drawCoverImage(ctx, photoImg, pixelX, pixelY, pixelW, pixelH);
+          const adj = slotAdjustments
+            ? (slotAdjustments[slotKey] || slotAdjustments[sIdx])
+            : undefined;
+          drawCoverImage(ctx, photoImg, pixelX, pixelY, pixelW, pixelH, adj);
 
           // Optional tint
           if (filter.tint) {
             ctx.fillStyle = `rgba(${filter.tint.r}, ${filter.tint.g}, ${filter.tint.b}, ${filter.tint.alpha})`;
             ctx.fillRect(pixelX, pixelY, pixelW, pixelH);
+          }
+
+          // Optional portrait spotlight vignette
+          if (filter.vignette) {
+            applyVignetteToRect(ctx, pixelX, pixelY, pixelW, pixelH, filter.vignette);
           }
           ctx.restore();
         } catch (slotErr) {
@@ -265,11 +330,16 @@ export async function renderCompositedPhoto({
           if (filter.cssFilter && filter.cssFilter !== 'none') {
             ctx.filter = filter.cssFilter;
           }
-          drawCoverImage(ctx, photoImg, slot.x, slot.y, slot.width, slot.height);
+          const adj = slotAdjustments ? slotAdjustments[slot.index] : undefined;
+          drawCoverImage(ctx, photoImg, slot.x, slot.y, slot.width, slot.height, adj);
 
           if (filter.tint) {
             ctx.fillStyle = `rgba(${filter.tint.r}, ${filter.tint.g}, ${filter.tint.b}, ${filter.tint.alpha})`;
             ctx.fillRect(slot.x, slot.y, slot.width, slot.height);
+          }
+
+          if (filter.vignette) {
+            applyVignetteToRect(ctx, slot.x, slot.y, slot.width, slot.height, filter.vignette);
           }
           ctx.restore();
         } catch (slotErr) {
@@ -288,6 +358,9 @@ export async function renderCompositedPhoto({
     if (filter.tint) {
       ctx.fillStyle = `rgba(${filter.tint.r}, ${filter.tint.g}, ${filter.tint.b}, ${filter.tint.alpha})`;
       ctx.fillRect(0, 0, width, height);
+    }
+    if (filter.vignette) {
+      applyVignetteToRect(ctx, 0, 0, width, height, filter.vignette);
     }
     ctx.restore();
   }

@@ -66,6 +66,16 @@ export const Step3Filters: React.FC<Step3FiltersProps> = ({
             />
           )}
 
+          {/* Portrait Spotlight Vignette */}
+          {activePreset.vignette && (
+            <div
+              className="absolute inset-0 pointer-events-none transition-all duration-300"
+              style={{
+                background: `radial-gradient(ellipse at center, rgba(0,0,0,0) ${(activePreset.vignette.innerRadius ?? 0.28) * 100}%, rgba(0,0,0,${activePreset.vignette.intensity * 0.35}) 50%, rgba(0,0,0,${activePreset.vignette.intensity * 0.70}) 75%, rgba(0,0,0,${activePreset.vignette.intensity}) ${(activePreset.vignette.outerRadius ?? 0.95) * 100}%)`,
+              }}
+            />
+          )}
+
           {/* Filter Name Watermark Pill */}
           <div className="absolute bottom-3 left-3 px-3 py-1 rounded-lg bg-black/70 backdrop-blur-md border border-white/10 text-xs text-white flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-amber-400" />
@@ -131,6 +141,14 @@ export const Step3Filters: React.FC<Step3FiltersProps> = ({
                       className="absolute inset-0 pointer-events-none"
                       style={{
                         backgroundColor: `rgba(${preset.tint.r}, ${preset.tint.g}, ${preset.tint.b}, ${preset.tint.alpha})`,
+                      }}
+                    />
+                  )}
+                  {preset.vignette && (
+                    <div
+                      className="absolute inset-0 pointer-events-none"
+                      style={{
+                        background: `radial-gradient(ellipse at center, rgba(0,0,0,0) ${(preset.vignette.innerRadius ?? 0.28) * 100}%, rgba(0,0,0,${preset.vignette.intensity * 0.45}) 55%, rgba(0,0,0,${preset.vignette.intensity}) 100%)`,
                       }}
                     />
                   )}

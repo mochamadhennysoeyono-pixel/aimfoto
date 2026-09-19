@@ -32,6 +32,7 @@ export const Step2ThemeSelect: React.FC<Step2ThemeSelectProps> = ({
   const [themes, setThemes] = useState<FrameTheme[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTheme, setActiveTheme] = useState<FrameTheme | null>(null);
+  const [failedThumbnails, setFailedThumbnails] = useState<Record<string, boolean>>({});
 
   const loadThemes = async () => {
     setIsLoading(true);
@@ -218,18 +219,22 @@ export const Step2ThemeSelect: React.FC<Step2ThemeSelectProps> = ({
                   </div>
 
                   {/* Theme Preview Visual */}
-                  <div className="relative w-full aspect-[16/9] rounded-xl bg-zinc-950/80 border border-zinc-800/90 overflow-hidden flex items-center justify-center mb-3">
-                    {theme.image_url ? (
+                  <div className="relative w-full aspect-[16/9] rounded-xl bg-zinc-950/90 border border-zinc-800/90 overflow-hidden flex items-center justify-center mb-3">
+                    {theme.image_url && !failedThumbnails[theme.id] ? (
                       <img
                         src={theme.image_url}
                         alt={theme.name}
-                        className="w-full h-full object-contain p-2"
+                        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+                        onError={() => setFailedThumbnails((prev) => ({ ...prev, [theme.id]: true }))}
                       />
                     ) : (
-                      <div className="flex flex-col items-center justify-center text-zinc-600 gap-1">
-                        <Layers className="w-8 h-8 text-amber-400/40" />
-                        <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-500">
+                      <div className="flex flex-col items-center justify-center text-zinc-500 gap-1.5 p-3 text-center">
+                        <Layers className="w-8 h-8 text-amber-400/60 stroke-[1.5]" />
+                        <span className="text-[11px] font-bold text-zinc-300">
                           {theme.name}
+                        </span>
+                        <span className="text-[10px] font-mono text-zinc-500">
+                          {theme.variants_count ?? 18} Varian Layout
                         </span>
                       </div>
                     )}

@@ -7,7 +7,7 @@ import {
   ArrowLeft,
   ShieldCheck,
   LayoutGrid,
-  Wallet,
+  Banknote,
   Settings,
 } from 'lucide-react';
 import { AdminGate } from './AdminGate';
@@ -16,7 +16,7 @@ import { AdminFrames } from './AdminFrames';
 import { AdminLayouts } from './AdminLayouts';
 import { AdminOrders } from './AdminOrders';
 import { AdminSetup } from './AdminSetup';
-import { AdminPaymentFlip } from './AdminPaymentFlip';
+import { AdminPaymentWhatsapp } from './AdminPaymentWhatsapp';
 
 export type AdminTab = 'events' | 'frames' | 'layouts' | 'orders' | 'setup' | 'payment';
 
@@ -28,11 +28,11 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { tab: 'events', label: 'Kelola Events', shortLabel: 'Events', icon: Calendar },
+  { tab: 'events', label: 'Kelola Events & Tarif', shortLabel: 'Events', icon: Calendar },
+  { tab: 'payment', label: 'Tarif, Promo & Kasir', shortLabel: 'Tarif & Promo', icon: Banknote },
   { tab: 'layouts', label: 'Kelola Layout', shortLabel: 'Layout', icon: LayoutGrid },
   { tab: 'frames', label: 'Kelola Frames', shortLabel: 'Frames', icon: ImageIcon },
   { tab: 'orders', label: 'Lihat Transaksi', shortLabel: 'Transaksi', icon: CreditCard },
-  { tab: 'payment', label: 'Integrasi Flip', shortLabel: 'Flip', icon: Wallet },
   { tab: 'setup', label: 'Setup Password', shortLabel: 'Sandi', icon: Settings },
 ];
 
@@ -60,7 +60,15 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   // Active admin tab determined from URL path or state
   const [activeTab, setActiveTab] = useState<AdminTab>(() => {
     const path = window.location.pathname.toLowerCase();
-    if (path.includes('/admin/payment') || path.includes('/admin/flip')) return 'payment';
+    if (
+      path.includes('/admin/payment') ||
+      path.includes('/admin/whatsapp') ||
+      path.includes('/admin/tarif') ||
+      path.includes('/admin/promo') ||
+      path.includes('/admin/harga') ||
+      path.includes('/admin/pricing')
+    )
+      return 'payment';
     if (path.includes('/admin/layouts')) return 'layouts';
     if (path.includes('/admin/frames')) return 'frames';
     if (path.includes('/admin/orders')) return 'orders';
@@ -89,7 +97,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
       else if (path.includes('/admin/frames')) setActiveTab('frames');
       else if (path.includes('/admin/orders')) setActiveTab('orders');
       else if (path.includes('/admin/setup')) setActiveTab('setup');
-      else if (path.includes('/admin/payment') || path.includes('/admin/flip')) setActiveTab('payment');
+      else if (path.includes('/admin/payment') || path.includes('/admin/whatsapp')) setActiveTab('payment');
       else if (path.includes('/admin')) setActiveTab('events');
       else onBackToKiosk();
     };
@@ -236,7 +244,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
 
         {activeTab === 'orders' && <AdminOrders />}
 
-        {activeTab === 'payment' && <AdminPaymentFlip />}
+        {activeTab === 'payment' && <AdminPaymentWhatsapp />}
 
         {activeTab === 'setup' && <AdminSetup />}
       </main>

@@ -83,6 +83,16 @@ export const Step5Filters: React.FC<Step5FiltersProps> = ({
             />
           )}
 
+          {/* Portrait Spotlight Vignette (Fokus Lighting di Tengah, Tepi Menghitam) */}
+          {activePreset.vignette && (
+            <div
+              className="absolute inset-0 pointer-events-none transition-all duration-300"
+              style={{
+                background: `radial-gradient(ellipse at center, rgba(0,0,0,0) ${(activePreset.vignette.innerRadius ?? 0.28) * 100}%, rgba(0,0,0,${activePreset.vignette.intensity * 0.35}) 50%, rgba(0,0,0,${activePreset.vignette.intensity * 0.70}) 75%, rgba(0,0,0,${activePreset.vignette.intensity}) ${(activePreset.vignette.outerRadius ?? 0.95) * 100}%)`,
+              }}
+            />
+          )}
+
           {/* Filter Name Watermark Pill */}
           <div className="absolute bottom-3 left-3 px-3 py-1 rounded-lg bg-black/70 backdrop-blur-md border border-white/10 text-xs text-white flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-amber-400" />
@@ -116,9 +126,10 @@ export const Step5Filters: React.FC<Step5FiltersProps> = ({
 
       {/* Filter Presets Carousel */}
       <div className="py-2 shrink-0">
-        <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
+        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
           {FILTER_PRESETS.map((preset) => {
             const isSelected = activePreset.id === preset.id;
+            const isPortrait = preset.id.startsWith('portrait');
 
             return (
               <button
@@ -128,9 +139,16 @@ export const Step5Filters: React.FC<Step5FiltersProps> = ({
                 className={`relative flex flex-col items-center p-1.5 rounded-xl border transition-all cursor-pointer ${
                   isSelected
                     ? 'border-amber-400 bg-amber-500/10 ring-2 ring-amber-400/30'
+                    : isPortrait
+                    ? 'border-cyan-500/40 bg-zinc-900/80 hover:border-cyan-500/70'
                     : 'border-zinc-800 bg-zinc-900/60 hover:border-zinc-700'
                 }`}
               >
+                {isPortrait && (
+                  <span className="absolute -top-1.5 right-1 px-1.5 py-0.2 rounded-full text-[8px] font-bold bg-cyan-500 text-zinc-950 shadow z-10 uppercase tracking-tighter">
+                    Potret
+                  </span>
+                )}
                 <div className="w-full aspect-square rounded-lg overflow-hidden relative bg-zinc-950 mb-1">
                   {currentPhoto ? (
                     <img
@@ -142,8 +160,19 @@ export const Step5Filters: React.FC<Step5FiltersProps> = ({
                   ) : (
                     <div className="w-full h-full bg-zinc-800" />
                   )}
+
+                  {/* Thumbnail Vignette Spotlight */}
+                  {preset.vignette && (
+                    <div
+                      className="absolute inset-0 pointer-events-none"
+                      style={{
+                        background: `radial-gradient(ellipse at center, rgba(0,0,0,0) ${(preset.vignette.innerRadius ?? 0.28) * 100}%, rgba(0,0,0,${preset.vignette.intensity * 0.45}) 55%, rgba(0,0,0,${preset.vignette.intensity}) 100%)`,
+                      }}
+                    />
+                  )}
+
                   {isSelected && (
-                    <div className="absolute inset-0 bg-amber-500/30 flex items-center justify-center">
+                    <div className="absolute inset-0 bg-amber-500/30 flex items-center justify-center z-10">
                       <div className="w-4 h-4 rounded-full bg-amber-400 text-zinc-950 flex items-center justify-center shadow">
                         <Check className="w-2.5 h-2.5 stroke-[3]" />
                       </div>
@@ -152,7 +181,11 @@ export const Step5Filters: React.FC<Step5FiltersProps> = ({
                 </div>
                 <span
                   className={`text-[10px] font-medium truncate w-full text-center ${
-                    isSelected ? 'text-amber-300 font-bold' : 'text-zinc-400'
+                    isSelected
+                      ? 'text-amber-300 font-bold'
+                      : isPortrait
+                      ? 'text-cyan-300 font-semibold'
+                      : 'text-zinc-400'
                   }`}
                 >
                   {preset.nama}

@@ -18,6 +18,8 @@ import {
   Loader2,
   Check,
   X,
+  Copy,
+  Printer,
 } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import { AdminEventItem } from './AdminEvents';
@@ -25,6 +27,8 @@ import {
   deleteSessionPhotoFromStorage,
   deleteAllSessionPhotosFromStorage,
 } from '../services/storageService';
+import { openPrintTab, downloadPhotoFile } from './printUtils';
+import { sendToPrinter } from '../services/printerService';
 
 export interface AdminOrderItem {
   id: string;
@@ -53,6 +57,75 @@ export const AdminOrders: React.FC = () => {
   const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [copiedOrderId, setCopiedOrderId] = useState<string | null>(null);
+
+  // Print & Download States
+  const [printingOrderId, setPrintingOrderId] = useState<string | null>(null);
+  const [downloadingOrderId, setDownloadingOrderId] = useState<string | null>(null);
+  const [activePrintNotice, setActivePrintNotice] = useState<{
+    orderShort: string;
+    blobUrl: string;
+    wasBlocked: boolean;
+  } | null>(null);
+
+  const handleCopyOrderUrl = async (orderId: string, url: string) => {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiedOrderId(orderId);
+      setTimeout(() => setCopiedOrderId(null), 2000);
+    } catch (e) {
+      console.warn('Gagal salin URL:', e);
+    }
+  };
+
+  const handleDirectPrint = async (ord: AdminOrderItem) => {
+    const url = ord.finalUrl || ord.previewUrl;
+    if (!url) return;
+    setPrintingOrderId(ord.id);
+    const orderShort = ord.id.slice(0, 8).toUpperCase();
+    try {
+      // Rekam di printer service jika terpasang spooler
+      sendToPrinter(ord.id, url).catch(() => {});
+
+      const result = openPrintTab(url, {
+        title: `Photobooth - ${ord.eventName || 'Order'} #${orderShort} (10x15cm 4R)`,
+        orderShort,
+      });
+
+      setActivePrintNotice({
+        orderShort,
+        blobUrl: result.blobUrl,
+        wasBlocked: !result.success,
+      });
+
+      if (result.success) {
+        setSuccessNotice(`Tab cetak 10x15cm (4R) dibuka untuk order #${orderShort}. Dialog cetak browser akan otomatis muncul di tab tersebut.`);
+        setTimeout(() => setSuccessNotice(null), 5000);
+      }
+    } catch (err) {
+      console.warn('Gagal membuka dialog cetak:', err);
+    } finally {
+      setPrintingOrderId(null);
+    }
+  };
+
+  const handleDirectDownload = async (ord: AdminOrderItem) => {
+    const url = ord.finalUrl || ord.previewUrl;
+    if (!url) return;
+    setDownloadingOrderId(ord.id);
+    const orderShort = ord.id.slice(0, 8).toUpperCase();
+    const eventSlug = ord.eventName?.replace(/[^a-zA-Z0-9]/g, '_') || 'event';
+    const filename = `photobooth-${eventSlug}-${orderShort}.jpg`;
+    try {
+      await downloadPhotoFile(url, filename);
+      setSuccessNotice(`Foto order #${orderShort} berhasil diunduh.`);
+      setTimeout(() => setSuccessNotice(null), 4000);
+    } catch (err) {
+      console.warn('Gagal unduh foto:', err);
+    } finally {
+      setDownloadingOrderId(null);
+    }
+  };
 
   // Filters
   const [filterEventId, setFilterEventId] = useState<string>('all');
@@ -388,6 +461,58 @@ export const AdminOrders: React.FC = () => {
         </div>
       )}
 
+      {/* Active Print Notice Banner (dengan tombol langsung ke lembar cetak tab baru) */}
+      {activePrintNotice && (
+        <div
+          className={`p-4 rounded-2xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-in fade-in duration-200 shadow-xl ${
+            activePrintNotice.wasBlocked
+              ? 'bg-amber-500/15 border-amber-500/40 text-amber-200'
+              : 'bg-zinc-900/90 border-amber-500/30 text-zinc-200'
+          }`}
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center shrink-0">
+              <Printer className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-white flex items-center gap-2">
+                <span>
+                  {activePrintNotice.wasBlocked
+                    ? `⚠️ Pop-up Browser Terblokir: Order #${activePrintNotice.orderShort}`
+                    : `🖨️ Lembar Cetak 10x15cm (4R) Order #${activePrintNotice.orderShort}`}
+                </span>
+                <span className="text-[10px] px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 font-mono">
+                  Ready to Print
+                </span>
+              </p>
+              <p className="text-[11px] text-zinc-300 mt-0.5">
+                {activePrintNotice.wasBlocked
+                  ? 'Karena preview berjalan di dalam iframe, silakan klik tombol di samping untuk membuka lembar cetak di tab baru:'
+                  : 'Jika dialog print browser belum otomatis muncul di tab Anda, klik tombol ini:'}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
+            <a
+              href={activePrintNotice.blobUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="flex-1 sm:flex-none px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-zinc-950 text-xs font-bold flex items-center justify-center gap-2 shadow-lg shadow-amber-500/25 transition-all"
+            >
+              <Printer className="w-4 h-4" />
+              <span>Buka Halaman Cetak 10x15cm ↗</span>
+            </a>
+            <button
+              onClick={() => setActivePrintNotice(null)}
+              className="p-2 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors cursor-pointer"
+              title="Tutup pemberitahuan"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Error alert */}
       {errorMsg && (
         <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-start gap-2.5">
@@ -534,7 +659,7 @@ export const AdminOrders: React.FC = () => {
                 <th className="py-3 px-4 font-mono">Jumlah Bayar</th>
                 <th className="py-3 px-4 text-center">Foto Cloud</th>
                 <th className="py-3 px-4 text-center">Status</th>
-                <th className="py-3 px-4 text-right">Aksi</th>
+                <th className="py-3 px-4 text-center min-w-[210px]">Aksi & Cetak</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-800/80">
@@ -615,17 +740,31 @@ export const AdminOrders: React.FC = () => {
                       {/* Cloud Photo Link */}
                       <td className="py-3 px-4 text-center">
                         {ord.finalUrl ? (
-                          <a
-                            href={ord.finalUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-sky-500/15 border border-sky-500/30 text-sky-400 hover:bg-sky-500/25 text-[11px] font-medium transition-colors"
-                            title="Buka Foto HD di Supabase Storage"
-                          >
-                            <ImageIcon className="w-3.5 h-3.5" />
-                            <span>Foto HD</span>
-                            <ExternalLink className="w-3 h-3 opacity-70" />
-                          </a>
+                          <div className="inline-flex items-center justify-center gap-1.5">
+                            <a
+                              href={ord.finalUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-sky-500/15 border border-sky-500/30 text-sky-400 hover:bg-sky-500/25 text-[11px] font-medium transition-colors"
+                              title="Buka Foto HD di Supabase Storage"
+                            >
+                              <ImageIcon className="w-3.5 h-3.5" />
+                              <span>Foto HD</span>
+                              <ExternalLink className="w-3 h-3 opacity-70" />
+                            </a>
+                            <button
+                              type="button"
+                              onClick={() => handleCopyOrderUrl(ord.id, ord.finalUrl!)}
+                              className="p-1 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white border border-zinc-800 transition-colors"
+                              title="Salin Link Soft File untuk dikirim ke Tamu via WA"
+                            >
+                              {copiedOrderId === ord.id ? (
+                                <Check className="w-3.5 h-3.5 text-emerald-400" />
+                              ) : (
+                                <Copy className="w-3.5 h-3.5" />
+                              )}
+                            </button>
+                          </div>
                         ) : ord.previewUrl ? (
                           <span className="text-[10px] font-mono text-zinc-500">Draft Foto</span>
                         ) : (
@@ -648,19 +787,63 @@ export const AdminOrders: React.FC = () => {
                         </span>
                       </td>
 
-                      {/* Aksi / Hapus */}
-                      <td className="py-3 px-4 text-right">
-                        <button
-                          onClick={() => {
-                            setDeleteError(null);
-                            setOrderToDelete(ord);
-                          }}
-                          disabled={isDeleting}
-                          className="p-2 rounded-lg bg-zinc-900/80 hover:bg-rose-500/20 text-zinc-400 hover:text-rose-400 border border-zinc-800 hover:border-rose-500/40 transition-colors cursor-pointer disabled:opacity-40"
-                          title="Hapus transaksi ini (termasuk session & file storage)"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                      {/* Aksi / Print / Download / Hapus */}
+                      <td className="py-3 px-4 text-center whitespace-nowrap">
+                        <div className="inline-flex items-center justify-center gap-1.5">
+                          {/* Tombol Print Langsung Browser (10x15cm 4R) */}
+                          <button
+                            type="button"
+                            onClick={() => handleDirectPrint(ord)}
+                            disabled={(!ord.finalUrl && !ord.previewUrl) || printingOrderId === ord.id}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-400 hover:text-amber-300 text-xs font-semibold transition-all shadow-sm cursor-pointer disabled:opacity-35 disabled:cursor-not-allowed"
+                            title={
+                              ord.finalUrl || ord.previewUrl
+                                ? 'Cetak langsung ke printer browser (10x15cm / 4R / 1200x1800 borderless)'
+                                : 'Foto belum tersedia untuk dicetak'
+                            }
+                          >
+                            {printingOrderId === ord.id ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <Printer className="w-3.5 h-3.5" />
+                            )}
+                            <span>Print</span>
+                          </button>
+
+                          {/* Tombol Download Foto HD */}
+                          <button
+                            type="button"
+                            onClick={() => handleDirectDownload(ord)}
+                            disabled={(!ord.finalUrl && !ord.previewUrl) || downloadingOrderId === ord.id}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-sky-500/15 hover:bg-sky-500/25 border border-sky-500/30 text-sky-400 hover:text-sky-300 text-xs font-semibold transition-all shadow-sm cursor-pointer disabled:opacity-35 disabled:cursor-not-allowed"
+                            title={
+                              ord.finalUrl || ord.previewUrl
+                                ? 'Download file foto (.jpg) asli'
+                                : 'Foto belum tersedia untuk diunduh'
+                            }
+                          >
+                            {downloadingOrderId === ord.id ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <Download className="w-3.5 h-3.5" />
+                            )}
+                            <span>Unduh</span>
+                          </button>
+
+                          {/* Tombol Hapus */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setDeleteError(null);
+                              setOrderToDelete(ord);
+                            }}
+                            disabled={isDeleting}
+                            className="p-1.5 rounded-xl bg-zinc-900/80 hover:bg-rose-500/20 text-zinc-400 hover:text-rose-400 border border-zinc-800 hover:border-rose-500/40 transition-colors cursor-pointer disabled:opacity-40"
+                            title="Hapus transaksi ini (termasuk session & file storage)"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );

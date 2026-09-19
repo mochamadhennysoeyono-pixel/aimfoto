@@ -7,10 +7,17 @@ import {
   Sparkles,
   Layers,
   CheckCircle2,
+  Download,
+  Archive,
+  FileImage,
 } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import { PhotoboothLayout, LayoutSlot } from '../types';
 import { DEFAULT_LAYOUTS, sortLayoutsList } from '../data/defaultLayouts';
+import {
+  downloadSingleLayout,
+  downloadAllLayoutsAsZip,
+} from '../utils/layoutImageGenerator';
 
 export const AdminLayouts: React.FC = () => {
   const [layouts, setLayouts] = useState<PhotoboothLayout[]>([]);
@@ -18,6 +25,12 @@ export const AdminLayouts: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [selectedLayoutId, setSelectedLayoutId] = useState<string | null>(null);
   const [linkedFramesCount, setLinkedFramesCount] = useState<{ [layoutId: string]: number }>({});
+
+  // Download States
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [isDownloadingAll, setIsDownloadingAll] = useState<boolean>(false);
+  const [zipProgressText, setZipProgressText] = useState<string>('');
+  const [successToast, setSuccessToast] = useState<string | null>(null);
 
   const fetchLayouts = useCallback(async () => {
     setIsLoading(true);
@@ -85,6 +98,42 @@ export const AdminLayouts: React.FC = () => {
   useEffect(() => {
     fetchLayouts();
   }, [fetchLayouts]);
+
+  // Handler: Download 1 Layout Gambar
+  const handleDownloadSingle = async (layout: PhotoboothLayout, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setDownloadingId(layout.id);
+    try {
+      await downloadSingleLayout(layout, { theme: 'dark', includeMetadata: true });
+      setSuccessToast(`Berhasil mengunduh gambar panduan: ${layout.name} (${layout.canvas_width}×${layout.canvas_height} px)`);
+      setTimeout(() => setSuccessToast(null), 4000);
+    } catch (err: any) {
+      console.error('Gagal unduh gambar layout:', err);
+      setErrorMessage(`Gagal mengunduh gambar layout: ${err.message || err}`);
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
+  // Handler: Download Semua Layout Gambar dalam format ZIP
+  const handleDownloadAll = async () => {
+    if (layouts.length === 0 || isDownloadingAll) return;
+    setIsDownloadingAll(true);
+    setZipProgressText('Menyiapkan generator gambar...');
+    try {
+      await downloadAllLayoutsAsZip(layouts, (curr, total, name) => {
+        setZipProgressText(`Merender (${curr}/${total}): ${name}...`);
+      });
+      setSuccessToast(`Sukses! Semua ${layouts.length} gambar layout telah dikemas dan diunduh.`);
+      setTimeout(() => setSuccessToast(null), 5000);
+    } catch (err: any) {
+      console.error('Gagal download semua layout:', err);
+      setErrorMessage(`Gagal membuat file ZIP semua layout: ${err.message || err}`);
+    } finally {
+      setIsDownloadingAll(false);
+      setZipProgressText('');
+    }
+  };
 
   const activeSelectedLayout =
     layouts.find((l) => l.id === selectedLayoutId) || layouts[0] || null;
@@ -166,15 +215,23 @@ export const AdminLayouts: React.FC = () => {
           </div>
         </div>
 
-        {/* Bottom Meta */}
-        <div className="mt-4 pt-3 border-t border-zinc-800/80 flex items-center justify-between text-[11px]">
-          <span className="text-zinc-400 flex items-center gap-1">
-            <Layers className="w-3.5 h-3.5 text-zinc-500" />
-            {frameCount} Frame terhubung
-          </span>
-          <span className="text-amber-400 font-medium">
-            {layout.slots.length} Slot Aktif
-          </span>
+        {/* Bottom Meta & Actions */}
+        <div className="mt-4 pt-3 border-t border-zinc-800/80 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5 text-[11px] text-zinc-400 truncate">
+            <Layers className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
+            <span className="truncate">{frameCount} Frame</span>
+          </div>
+
+          <button
+            type="button"
+            onClick={(e) => handleDownloadSingle(layout, e)}
+            disabled={downloadingId === layout.id}
+            className="px-2.5 py-1.5 rounded-lg bg-zinc-800/90 hover:bg-amber-500 hover:text-zinc-950 text-amber-300 border border-amber-500/30 font-semibold flex items-center gap-1.5 transition-all cursor-pointer text-[11px] shrink-0 shadow-sm disabled:opacity-50"
+            title={`Download file gambar template ${layout.name} (${layout.canvas_width}×${layout.canvas_height} px)`}
+          >
+            <Download className={`w-3.5 h-3.5 ${downloadingId === layout.id ? 'animate-bounce text-amber-400' : ''}`} />
+            <span>{downloadingId === layout.id ? 'Mengunduh...' : 'Download Layout'}</span>
+          </button>
         </div>
       </div>
     );
@@ -182,6 +239,38 @@ export const AdminLayouts: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {/* Success Toast */}
+      {successToast && (
+        <div className="p-3.5 rounded-xl bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 text-xs flex items-center justify-between gap-3 shadow-lg shadow-emerald-950/40 animate-in fade-in slide-in-from-top-2 duration-200">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span className="font-semibold">{successToast}</span>
+          </div>
+          <button
+            onClick={() => setSuccessToast(null)}
+            className="text-emerald-400 hover:text-white text-xs cursor-pointer font-bold px-2 py-0.5"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {/* Error Message Banner */}
+      {errorMessage && (
+        <div className="p-3.5 rounded-xl bg-red-500/15 border border-red-500/40 text-red-300 text-xs flex items-center justify-between gap-3 shadow-lg shadow-red-950/40">
+          <div className="flex items-center gap-2">
+            <Info className="w-4 h-4 text-red-400 shrink-0" />
+            <span className="font-semibold">{errorMessage}</span>
+          </div>
+          <button
+            onClick={() => setErrorMessage(null)}
+            className="text-red-400 hover:text-white text-xs cursor-pointer font-bold px-2 py-0.5"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {/* Header Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-zinc-800">
         <div>
@@ -200,7 +289,22 @@ export const AdminLayouts: React.FC = () => {
           </div>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2.5 flex-wrap">
+          {/* Download Semua Layout Button */}
+          <button
+            onClick={handleDownloadAll}
+            disabled={isDownloadingAll || layouts.length === 0}
+            className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-zinc-950 text-xs font-bold flex items-center gap-2 shadow-lg shadow-amber-500/20 transition-all cursor-pointer disabled:opacity-50"
+            title="Download seluruh gambar layout photobooth dalam format paket arsip .ZIP"
+          >
+            <Archive className={`w-4 h-4 ${isDownloadingAll ? 'animate-spin' : ''}`} />
+            <span>
+              {isDownloadingAll
+                ? zipProgressText || 'Memproses ZIP...'
+                : `Download Semua Layout (${layouts.length} ZIP)`}
+            </span>
+          </button>
+
           <button
             onClick={fetchLayouts}
             disabled={isLoading}
@@ -291,7 +395,7 @@ export const AdminLayouts: React.FC = () => {
               </p>
             </div>
 
-            <div className="flex items-center gap-3 text-xs font-mono">
+            <div className="flex items-center gap-3 text-xs font-mono flex-wrap">
               <span className="text-zinc-400">
                 Kanvas: <strong className="text-white">{activeSelectedLayout.canvas_width} × {activeSelectedLayout.canvas_height} px</strong>
               </span>
@@ -299,6 +403,15 @@ export const AdminLayouts: React.FC = () => {
               <span className="text-zinc-400">
                 Rasio: <strong className="text-white">{activeSelectedLayout.ratio}</strong>
               </span>
+              <button
+                type="button"
+                onClick={() => handleDownloadSingle(activeSelectedLayout)}
+                disabled={downloadingId === activeSelectedLayout.id}
+                className="ml-2 px-3 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
+              >
+                <Download className={`w-3.5 h-3.5 ${downloadingId === activeSelectedLayout.id ? 'animate-bounce' : ''}`} />
+                <span>{downloadingId === activeSelectedLayout.id ? 'Mengunduh...' : 'Download Gambar Panduan'}</span>
+              </button>
             </div>
           </div>
 
