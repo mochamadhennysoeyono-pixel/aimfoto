@@ -27,6 +27,7 @@ import { DEFAULT_LAYOUTS, normalizeLayout } from './data/defaultLayouts';
 import { generateUuid } from './utils/uuid';
 import { supabase, HARDCODED_EVENT_ID } from './supabaseClient';
 import { fetchEventsMetadata, getCachedEventMetadata } from './services/eventMetaService';
+import { fetchAdminWhatsapp } from './services/adminContactService';
 import { prefetchFrames } from './services/frameService';
 import { renderCompositedPhoto } from './utils/canvasRenderer';
 import { uploadFinalPhotoToStorage, uploadBoomerangToStorage } from './services/storageService';
@@ -311,7 +312,7 @@ export default function App() {
         eventData = eventRes.data;
         metaMap = fetchedMeta;
       } else {
-        // Ambil daftar event aktif dan metadata sekaligus secara paralel dalam 1 roundtrip
+        // Ambil daftar event aktif, metadata, dan nomor kontak admin sekaligus secara paralel dalam 1 roundtrip
         const [eventsRes, fetchedMeta] = await Promise.all([
           supabase
             .from('events')
@@ -321,6 +322,7 @@ export default function App() {
             .neq('name', 'ADMIN_CONFIG')
             .order('created_at', { ascending: false }),
           fetchEventsMetadata(),
+          fetchAdminWhatsapp(),
         ]);
 
         metaMap = fetchedMeta;

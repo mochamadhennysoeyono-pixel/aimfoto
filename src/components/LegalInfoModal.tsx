@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   FileText,
   RotateCcw,
@@ -13,7 +13,7 @@ import {
   MessageSquare,
   ArrowRight,
 } from 'lucide-react';
-import { getAdminWhatsapp } from '../services/adminContactService';
+import { getAdminWhatsapp, fetchAdminWhatsapp } from '../services/adminContactService';
 
 export type LegalTab = 'terms' | 'refund' | 'contact' | 'privacy';
 
@@ -29,7 +29,13 @@ export const LegalInfoModal: React.FC<LegalInfoModalProps> = ({
   onClose,
 }) => {
   const [activeTab, setActiveTab] = useState<LegalTab>(initialTab);
-  const adminPhone = getAdminWhatsapp();
+  const [adminPhone, setAdminPhone] = useState<string>(getAdminWhatsapp());
+
+  useEffect(() => {
+    fetchAdminWhatsapp().then((p) => {
+      if (p) setAdminPhone(p);
+    });
+  }, []);
 
   // Format admin phone number for display
   const formattedAdminPhone = adminPhone.startsWith('62')

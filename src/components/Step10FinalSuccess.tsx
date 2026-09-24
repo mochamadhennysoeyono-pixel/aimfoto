@@ -23,7 +23,7 @@ import { playSuccessChime } from '../utils/audioEffects';
 import { uploadFinalPhotoToStorage, uploadBoomerangToStorage } from '../services/storageService';
 import { generateBoomerangFromPhotos } from '../utils/boomerangRecorder';
 import { compileCompositedAnimatedFrameVideo } from '../utils/animatedFrameRenderer';
-import { getAdminWhatsapp } from '../services/adminContactService';
+import { getAdminWhatsapp, fetchAdminWhatsapp } from '../services/adminContactService';
 import { generateWhatsAppPaymentMessage, buildWhatsAppUrl } from '../utils/whatsappHelper';
 
 interface Step10FinalSuccessProps {
@@ -333,7 +333,13 @@ export const Step10FinalSuccess: React.FC<Step10FinalSuccessProps> = ({
     maximumFractionDigits: 0,
   }).format(order.harga);
 
-  const [adminPhone] = useState<string>(getAdminWhatsapp());
+  const [adminPhone, setAdminPhone] = useState<string>(getAdminWhatsapp());
+
+  useEffect(() => {
+    fetchAdminWhatsapp().then((p) => {
+      if (p) setAdminPhone(p);
+    });
+  }, []);
   const cleanPhone = adminPhone.replace(/[^0-9]/g, '');
   const targetWaNumber = cleanPhone.startsWith('0') ? '62' + cleanPhone.slice(1) : cleanPhone;
 

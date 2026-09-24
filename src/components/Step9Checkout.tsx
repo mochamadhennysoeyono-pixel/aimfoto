@@ -28,7 +28,7 @@ import {
   PhotoboothLayout,
   FilterPreset,
 } from '../types';
-import { getAdminWhatsapp } from '../services/adminContactService';
+import { getAdminWhatsapp, fetchAdminWhatsapp } from '../services/adminContactService';
 import { generateWhatsAppPaymentMessage, buildWhatsAppUrl } from '../utils/whatsappHelper';
 import { supabase, HARDCODED_EVENT_ID } from '../supabaseClient';
 import { generateUuid } from '../utils/uuid';
@@ -80,6 +80,9 @@ export const Step9Checkout: React.FC<Step9CheckoutProps> = ({
 
   useEffect(() => {
     fetchStaticQrisConfig().then((cfg) => setStaticQris(cfg));
+    fetchAdminWhatsapp().then((p) => {
+      if (p) setAdminPhone(p);
+    });
   }, []);
 
   // Mode pembayaran yang diizinkan admin ('all' | 'cash' | 'digital')

@@ -22,7 +22,7 @@ import {
   RefreshCw,
   Loader2,
 } from 'lucide-react';
-import { getAdminWhatsapp, saveAdminWhatsapp } from '../services/adminContactService';
+import { getAdminWhatsapp, saveAdminWhatsapp, fetchAdminWhatsapp } from '../services/adminContactService';
 import { isRealEvent } from '../utils/eventFilter';
 import { supabase } from '../supabaseClient.js';
 import {
@@ -78,16 +78,21 @@ export const AdminPaymentWhatsapp: React.FC = () => {
       setIsLoadingEvents(true);
     }
     try {
-      setAdminPhone(getAdminWhatsapp());
-
-      // Jalankan query events dan metadata secara PARALEL
-      const [eventsRes, metaMap] = await Promise.all([
+      // Jalankan query events, whatsapp, dan metadata secara PARALEL
+      const [eventsRes, metaMap, cloudPhone] = await Promise.all([
         supabase
           .from('events')
           .select('id, name, default_price, is_default, is_active')
           .order('created_at', { ascending: false }),
         fetchEventsMetadata(),
+        fetchAdminWhatsapp(),
       ]);
+
+      if (cloudPhone) {
+        setAdminPhone(cloudPhone);
+      } else {
+        setAdminPhone(getAdminWhatsapp());
+      }
 
       const filteredEvents: SimpleEventItem[] = (eventsRes.data || []).filter(isRealEvent);
       cachedPaymentEventsList = filteredEvents;
@@ -190,9 +195,9 @@ export const AdminPaymentWhatsapp: React.FC = () => {
     setIsSaving(true);
 
     try {
-      // 1. Simpan nomor WA
-      saveAdminWhatsapp(adminPhone);
-      setAdminPhone(getAdminWhatsapp());
+      // 1. Simpan nomor WA ke database cloud & localStorage
+      const savedPhone = await saveAdminWhatsapp(adminPhone);
+      setAdminPhone(savedPhone);
 
       const numDigital = isFreeEvent ? 0 : Number(hargaDigital) || 0;
       const numPrint = isFreeEvent ? 0 : Number(hargaPrint) || 0;
@@ -742,7 +747,7 @@ export const AdminPaymentWhatsapp: React.FC = () => {
                   type="text"
                   value={adminPhone || ''}
                   onChange={(e) => setAdminPhone(e.target.value)}
-                  placeholder="081234567890"
+                  placeholder="0822-2803-1995"
                   className="w-full bg-zinc-900/90 border border-zinc-700/80 rounded-xl py-2.5 px-3 text-xs text-white font-mono focus:outline-none focus:border-emerald-500"
                   required
                 />
