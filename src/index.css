@@ -1,6 +1,15 @@
 @import "tailwindcss";
 
 @layer base {
+  :root {
+    --mobile-bottom-nav-pb: max(3.25rem, calc(env(safe-area-inset-bottom, 0px) + 1.5rem));
+  }
+  @media (min-width: 640px) {
+    :root {
+      --mobile-bottom-nav-pb: max(1rem, env(safe-area-inset-bottom, 0px));
+    }
+  }
+
   html, body, #root {
     min-height: 100%;
     margin: 0;
@@ -42,3 +51,25 @@
   background: #272a38;
   border-radius: 4px;
 }
+
+/* Docked bottom action bar matching admin bottom nav but with mobile system bar clearance */
+.fixed-bottom-action-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  max-width: 32rem; /* matches max-w-lg */
+  margin-left: auto;
+  margin-right: auto;
+  background-color: rgba(10, 12, 19, 0.96);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-top: 1px solid rgba(39, 39, 42, 0.9);
+  box-shadow: 0 -12px 36px rgba(0, 0, 0, 0.85);
+  padding-left: 1rem;
+  padding-right: 1rem;
+  padding-top: 0.75rem;
+  padding-bottom: var(--mobile-bottom-nav-pb);
+}
+

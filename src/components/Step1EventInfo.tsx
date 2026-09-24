@@ -91,7 +91,7 @@ export const Step1EventInfo: React.FC<Step1EventInfoProps> = ({
   return (
     <div className="flex-1 flex flex-col max-w-xl mx-auto w-full relative">
       {/* Scrollable Event Info Content dengan padding bawah agar tidak tertutup bottom bar */}
-      <div className="p-4 sm:p-5 pb-36 space-y-4">
+      <div className="p-4 sm:p-5 pb-48 sm:pb-36 space-y-4">
         {/* Top Section: Header & Info Event */}
         <div className="space-y-3.5">
         {/* Banner Promo / Status Event */}
@@ -435,10 +435,7 @@ export const Step1EventInfo: React.FC<Step1EventInfoProps> = ({
       </div>
 
       {/* Bottom Action Bar (Fixed di Bawah Layar Seperti Bottom Nav Menu Admin) */}
-      <div
-        className="fixed bottom-0 left-0 right-0 z-40 max-w-lg mx-auto bg-[#0a0c13]/95 backdrop-blur-xl border-t border-zinc-800/90 shadow-[0_-10px_30px_rgba(0,0,0,0.8)] p-3 sm:p-4 space-y-2"
-        style={{ paddingBottom: 'max(0.85rem, env(safe-area-inset-bottom))' }}
-      >
+      <div className="fixed-bottom-action-bar space-y-2">
         <button
           id="btn-start-photobooth"
           onClick={onStart}

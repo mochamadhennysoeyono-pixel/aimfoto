@@ -175,7 +175,7 @@ export const Step2ThemeSelect: React.FC<Step2ThemeSelectProps> = ({
   return (
     <div className="flex-1 flex flex-col max-w-xl mx-auto w-full relative">
       {/* Scrollable Content Area dengan padding bawah agar tidak tertutup bottom bar */}
-      <div className="p-4 md:p-6 pb-28 sm:pb-32 space-y-4">
+      <div className="p-4 md:p-6 pb-44 sm:pb-32 space-y-4">
         {/* Header Bar */}
         <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
           <button
@@ -448,10 +448,7 @@ export const Step2ThemeSelect: React.FC<Step2ThemeSelectProps> = ({
       </div>
 
       {/* Bottom Action Bar (Fixed di Bawah Layar Seperti Bottom Nav Menu Admin) */}
-      <div
-        className="fixed bottom-0 left-0 right-0 z-40 max-w-lg mx-auto bg-[#0a0c13]/95 backdrop-blur-xl border-t border-zinc-800/90 shadow-[0_-10px_30px_rgba(0,0,0,0.8)] px-4 py-3"
-        style={{ paddingBottom: 'max(0.85rem, env(safe-area-inset-bottom))' }}
-      >
+      <div className="fixed-bottom-action-bar">
         <button
           id="btn-confirm-frame"
           disabled={!activeFrame}

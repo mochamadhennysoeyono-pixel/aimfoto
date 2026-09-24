@@ -564,7 +564,9 @@ export const Step4Camera: React.FC<Step4CameraProps> = ({
   };
 
   return (
-    <div className="flex-1 flex flex-col justify-between max-w-lg mx-auto w-full p-3 sm:p-4 min-h-0 overflow-y-auto">
+    <div className={`flex-1 flex flex-col justify-between max-w-lg mx-auto w-full p-3 sm:p-4 min-h-0 overflow-y-auto ${
+      capturedPhotos.length >= targetPhotoCount ? 'pb-44 sm:pb-32' : 'pb-16 sm:pb-8'
+    }`}>
       {/* Offscreen Canvas for capture */}
       <canvas ref={canvasRef} className="hidden" />
 
@@ -1020,7 +1022,7 @@ export const Step4Camera: React.FC<Step4CameraProps> = ({
 
       {/* Bottom Main Action Button when photos are complete */}
       {capturedPhotos.length >= targetPhotoCount && (
-        <div className="pt-2 pb-1 border-t border-zinc-800 flex flex-col gap-2 shrink-0">
+        <div className="fixed-bottom-action-bar">
           <button
             id="btn-proceed-to-filters"
             onClick={handleProceed}
