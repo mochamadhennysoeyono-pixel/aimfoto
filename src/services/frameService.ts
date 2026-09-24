@@ -1,6 +1,7 @@
 import { FrameLayoutItem, FrameTheme, PhotoboothLayout, LayoutSlot } from '../types';
 import { supabase } from '../supabaseClient';
 import { DEFAULT_LAYOUTS } from '../data/defaultLayouts';
+import { DEFAULT_ACTIVE_FRAMES } from '../data/defaultActiveFrames';
 import { getFrameCategoriesSync, fetchFrameCategoriesData } from './frameCategoryService';
 
 // Memory Cache
@@ -104,31 +105,71 @@ export function preloadFrameImages(frames: FrameLayoutItem[]): void {
 }
 
 /**
+ * Helper untuk memvalidasi apakah array data frame valid (bukan dummy 1-slot)
+ */
+function isValidFrameList(arr: any): arr is FrameLayoutItem[] {
+  if (!Array.isArray(arr) || arr.length === 0) return false;
+  const isDummy = arr.length === 1 && (arr[0].id === 'default-strip-3' || arr[0].frame_id === 'default-frame-1');
+  return !isDummy;
+}
+
+/**
  * Mengambil frames secara instan (0ms) dari RAM atau LocalStorage jika ada
  */
 export function getCachedFramesSync(eventId?: string): FrameLayoutItem[] | null {
   const cacheKey = eventId && eventId !== 'all' ? `event_${eventId}` : 'event_all';
   
-  // 1. Cek memory cache
+  // 1. Cek memory cache key spesifik
   const inMemory = memoryCache.get(cacheKey);
-  if (inMemory && inMemory.data.length > 0) {
-    const isDummy = inMemory.data.length === 1 && (inMemory.data[0].id === 'default-strip-3' || inMemory.data[0].frame_id === 'default-frame-1');
-    if (!isDummy) return inMemory.data;
+  if (inMemory && isValidFrameList(inMemory.data)) {
+    return inMemory.data;
   }
 
-  // 2. Cek localStorage
+  // 1b. Cek memory cache event_all
+  if (cacheKey !== 'event_all') {
+    const inMemoryAll = memoryCache.get('event_all');
+    if (inMemoryAll && isValidFrameList(inMemoryAll.data)) {
+      return inMemoryAll.data;
+    }
+  }
+
+  // 1c. Cek semua entri memory cache yang valid
+  for (const entry of memoryCache.values()) {
+    if (isValidFrameList(entry.data)) {
+      return entry.data;
+    }
+  }
+
+  // 2. Cek localStorage key spesifik
   const raw = safeGet(`photobooth_cached_frames_${cacheKey}`);
   if (raw) {
     try {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        const isDummy = parsed.length === 1 && (parsed[0].id === 'default-strip-3' || parsed[0].frame_id === 'default-frame-1');
-        if (!isDummy) {
-          memoryCache.set(cacheKey, { data: parsed, timestamp: Date.now() });
-          return parsed;
-        }
+      if (isValidFrameList(parsed)) {
+        memoryCache.set(cacheKey, { data: parsed, timestamp: Date.now() });
+        return parsed;
       }
     } catch (_) {}
+  }
+
+  // 2b. Cek localStorage event_all
+  if (cacheKey !== 'event_all') {
+    const rawAll = safeGet('photobooth_cached_frames_event_all');
+    if (rawAll) {
+      try {
+        const parsedAll = JSON.parse(rawAll);
+        if (isValidFrameList(parsedAll)) {
+          memoryCache.set(cacheKey, { data: parsedAll, timestamp: Date.now() });
+          return parsedAll;
+        }
+      } catch (_) {}
+    }
+  }
+
+  // 3. Fallback instan ke DEFAULT_ACTIVE_FRAMES (22 frame ril dari D1/Supabase)
+  if (DEFAULT_ACTIVE_FRAMES && DEFAULT_ACTIVE_FRAMES.length > 0) {
+    memoryCache.set(cacheKey, { data: DEFAULT_ACTIVE_FRAMES, timestamp: Date.now() });
+    return DEFAULT_ACTIVE_FRAMES;
   }
 
   return null;
@@ -263,7 +304,7 @@ export async function fetchActiveFrames(
         });
       } else {
         // Fallback default
-        items = [
+        items = DEFAULT_ACTIVE_FRAMES && DEFAULT_ACTIVE_FRAMES.length > 0 ? DEFAULT_ACTIVE_FRAMES : [
           {
             id: 'default-strip-3',
             frame_id: 'default-frame-1',
@@ -283,7 +324,13 @@ export async function fetchActiveFrames(
 
       // Update cache
       memoryCache.set(cacheKey, { data: items, timestamp: Date.now() });
+      memoryCache.set('event_all', { data: items, timestamp: Date.now() });
       safeSet(`photobooth_cached_frames_${cacheKey}`, JSON.stringify(items));
+      safeSet('photobooth_cached_frames_event_all', JSON.stringify(items));
+      if (eventId && eventId !== 'all') {
+        memoryCache.set(`event_${eventId}`, { data: items, timestamp: Date.now() });
+        safeSet(`photobooth_cached_frames_event_${eventId}`, JSON.stringify(items));
+      }
 
       // Preload image thumbnails
       preloadFrameImages(items);
