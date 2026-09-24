@@ -230,7 +230,7 @@ export const Step8PreviewLocked: React.FC<Step8PreviewLockedProps> = ({
       </div>
 
       {/* Watermarked Photo Container */}
-      <div className="relative w-full flex-1 flex items-center justify-center my-2 min-h-[250px] max-h-[46vh] overflow-hidden">
+      <div className="relative w-full h-[42vh] sm:h-[46vh] md:h-[50vh] min-h-[280px] max-h-[500px] flex items-center justify-center my-2 overflow-hidden">
         {isLoading || !watermarkedImg ? (
           <div className="w-full h-full max-w-xs flex flex-col items-center justify-center gap-2 text-zinc-400 bg-zinc-950 rounded-2xl border border-zinc-800">
             <div className="w-8 h-8 rounded-full border-2 border-amber-400 border-t-transparent animate-spin" />

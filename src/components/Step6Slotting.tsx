@@ -72,9 +72,9 @@ export const Step6Slotting: React.FC<Step6SlottingProps> = ({
   };
 
   // Mode tampilan: 'progressive' (foto saat ini + foto sebelumnya yang sudah di-set) atau 'all' (semua foto)
-  const [viewMode, setViewMode] = useState<'progressive' | 'all'>('progressive');
+  const [viewMode, setViewMode] = useState<'progressive' | 'all'>('all');
 
-  // Transparansi Frame Slider (0.1 sampai 1.0) untuk melihat lubang bingkai secara otomatis 50%
+  // Transparansi Frame Slider (0.1 sampai 1.0) - default awal 50% (0.5), bisa disesuaikan user secara bebas
   const [frameOpacity, setFrameOpacity] = useState<number>(0.5);
 
   const slots = layout.slots || [];
@@ -512,16 +512,16 @@ export const Step6Slotting: React.FC<Step6SlottingProps> = ({
 
       {/* Main Canvas Area */}
       <div
-        className="relative w-full flex-1 flex items-center justify-center my-1 p-2 min-h-[300px] max-h-[46vh] bg-zinc-950 rounded-2xl overflow-hidden border border-zinc-800 shadow-2xl"
+        className="relative w-full h-[42vh] sm:h-[46vh] md:h-[50vh] min-h-[320px] max-h-[520px] flex items-center justify-center my-1 p-2 bg-zinc-950 rounded-2xl overflow-hidden border border-zinc-800 shadow-2xl"
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
       >
         <div
           ref={canvasBoxRef}
-          className="relative max-h-full max-w-full rounded-xl overflow-hidden bg-[#0c0e15] border border-zinc-800/80 shadow-inner select-none"
+          className="relative h-full max-h-full max-w-full rounded-xl overflow-hidden bg-[#0c0e15] border border-zinc-800/80 shadow-inner select-none"
           style={{
             aspectRatio: `${layout.canvas_width || 1200} / ${layout.canvas_height || 1800}`,
-            height: '100%',
+            width: 'auto',
           }}
         >
           {/* Layer 1: Slotted Photos */}
@@ -679,13 +679,15 @@ export const Step6Slotting: React.FC<Step6SlottingProps> = ({
           })}
 
           {/* Layer 2: Transparent PNG Frame Overlay */}
-          {frameUrl && (
+          {frameUrl ? (
             <img
               src={frameUrl}
               alt="Frame Photobooth"
               className="absolute inset-0 w-full h-full object-fill pointer-events-none z-20 transition-opacity duration-150"
               style={{ opacity: frameOpacity }}
             />
+          ) : (
+            <div className="absolute inset-0 pointer-events-none z-20 border border-amber-500/20" />
           )}
         </div>
       </div>
@@ -769,6 +771,32 @@ export const Step6Slotting: React.FC<Step6SlottingProps> = ({
             <span className="text-[11px] font-mono text-amber-400 font-bold shrink-0 w-8 text-right">
               {Math.round(frameOpacity * 100)}%
             </span>
+            <div className="flex items-center gap-1 shrink-0 ml-1">
+              <button
+                type="button"
+                onClick={() => setFrameOpacity(1.0)}
+                className={`px-1.5 py-0.5 rounded text-[10px] cursor-pointer border transition-colors ${
+                  frameOpacity >= 0.95
+                    ? 'bg-amber-500 text-zinc-950 border-amber-400 font-bold'
+                    : 'bg-zinc-800 text-zinc-400 border-zinc-700 hover:text-white'
+                }`}
+                title="Tampilkan Frame 100% Penuh"
+              >
+                100%
+              </button>
+              <button
+                type="button"
+                onClick={() => setFrameOpacity(0.5)}
+                className={`px-1.5 py-0.5 rounded text-[10px] cursor-pointer border transition-colors ${
+                  frameOpacity < 0.95 && frameOpacity >= 0.45
+                    ? 'bg-amber-500 text-zinc-950 border-amber-400 font-bold'
+                    : 'bg-zinc-800 text-zinc-400 border-zinc-700 hover:text-white'
+                }`}
+                title="Transparansi 50% untuk intip batas lubang foto"
+              >
+                Intip 50%
+              </button>
+            </div>
           </div>
         </div>
 

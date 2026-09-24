@@ -589,12 +589,15 @@ export default function App() {
     }
     const layoutObj = normalizeLayout(combination.layout || DEFAULT_LAYOUTS[0]);
     setActiveLayout(layoutObj);
-    setActiveFramePngUrl(combination.image_url || '');
+    const framePng = combination.image_url || combination.frame?.image_url || '';
+    setActiveFramePngUrl(framePng);
 
     setSession((prev) => ({
       ...prev,
       frameDipilih: combination.frame_id,
       frame_layout_id: combination.id,
+      selectedFrameLayout: combination,
+      selectedTheme: combination.frame,
       layout: layoutObj,
     }));
 
@@ -941,6 +944,9 @@ export default function App() {
             />
           )}
 
+          {/* URL Frame PNG Aktif dengan fallback multi-sumber */}
+          {(() => null)()}
+
           {/* STEP 5: Filter Warna */}
           {currentStep === 'filter' && (
             <Step5Filters
@@ -958,7 +964,16 @@ export default function App() {
               photos={session.capturedPhotos}
               layout={activeLayout}
               filter={activeFilter}
-              frameUrl={activeFramePngUrl}
+              frameUrl={
+                activeFramePngUrl ||
+                selectedFrameLayout?.image_url ||
+                selectedFrameLayout?.frame?.image_url ||
+                selectedTheme?.image_url ||
+                session.selectedFrameLayout?.image_url ||
+                session.selectedFrameLayout?.frame?.image_url ||
+                session.selectedTheme?.image_url ||
+                ''
+              }
               slotAssignments={session.slotAssignments}
               onUpdateSlotAssignments={handleUpdateSlotAssignments}
               slotAdjustments={session.slotAdjustments || {}}
@@ -974,7 +989,16 @@ export default function App() {
               photos={session.capturedPhotos}
               slotAssignments={session.slotAssignments}
               layout={activeLayout}
-              frameUrl={activeFramePngUrl}
+              frameUrl={
+                activeFramePngUrl ||
+                selectedFrameLayout?.image_url ||
+                selectedFrameLayout?.frame?.image_url ||
+                selectedTheme?.image_url ||
+                session.selectedFrameLayout?.image_url ||
+                session.selectedFrameLayout?.frame?.image_url ||
+                session.selectedTheme?.image_url ||
+                ''
+              }
               themeName={selectedTheme?.name || 'Photobooth Frame'}
               filter={activeFilter}
               decorations={session.decorations || []}
@@ -993,7 +1017,16 @@ export default function App() {
               slotAssignments={session.slotAssignments}
               slotAdjustments={session.slotAdjustments || {}}
               layout={activeLayout}
-              frameUrl={activeFramePngUrl}
+              frameUrl={
+                activeFramePngUrl ||
+                selectedFrameLayout?.image_url ||
+                selectedFrameLayout?.frame?.image_url ||
+                selectedTheme?.image_url ||
+                session.selectedFrameLayout?.image_url ||
+                session.selectedFrameLayout?.frame?.image_url ||
+                session.selectedTheme?.image_url ||
+                ''
+              }
               filter={activeFilter}
               price={
                 selectedPackage === 'digital'
