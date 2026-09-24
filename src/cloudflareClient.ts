@@ -5,6 +5,9 @@
  * - File uploads/downloads stored on Cloudflare R2 with ZERO egress fees
  */
 
+import { DEFAULT_ACTIVE_FRAMES } from './data/defaultActiveFrames';
+import { DEFAULT_LAYOUTS } from './data/defaultLayouts';
+
 export const HARDCODED_EVENT_ID =
   (typeof import.meta !== 'undefined' && import.meta.env?.VITE_EVENT_ID) ||
   'f1723176-eaa7-4c1d-bfc9-2c112677bb38';
@@ -12,6 +15,18 @@ export const HARDCODED_EVENT_ID =
 export const R2_PUBLIC_URL =
   (typeof import.meta !== 'undefined' && import.meta.env?.VITE_R2_PUBLIC_URL) ||
   'https://pub-9ab796572b1a43ad87628fe9260ddf61.r2.dev';
+
+// Client-side in-memory query cache for SELECT statements
+interface ClientCacheEntry {
+  data: any[];
+  timestamp: number;
+}
+const clientQueryCache = new Map<string, ClientCacheEntry>();
+const CLIENT_CACHE_TTL_MS = 30 * 1000; // 30 detik
+
+export function clearClientQueryCache(): void {
+  clientQueryCache.clear();
+}
 
 interface QueryFilter {
   column: string;
@@ -167,15 +182,103 @@ export class D1QueryBuilder {
         sql += ` LIMIT ${this.limitCount}`;
       }
 
-      const response = await fetch('/api/d1/query', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sql, params }),
-      });
+      const cacheKey = `${sql.trim()}__${JSON.stringify(params || [])}`;
 
-      const resJson = await response.json();
-      if (!resJson.success) {
-        return { data: null, error: { message: resJson.error || 'D1 Query Error' } };
+      // Cek client in-memory cache
+      const cached = clientQueryCache.get(cacheKey);
+      if (cached && Date.now() - cached.timestamp < CLIENT_CACHE_TTL_MS) {
+        let rows = cached.data;
+        if (this.isSingleResult) {
+          if (rows.length === 0) return { data: null, error: { message: 'Row not found' } };
+          return { data: rows[0], error: null };
+        }
+        if (this.isMaybeSingleResult) {
+          return { data: rows[0] || null, error: null };
+        }
+        return { data: rows, error: null };
+      }
+
+      let resJson: any = null;
+      try {
+        const response = await fetch('/api/d1/query', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sql, params }),
+        });
+        resJson = await response.json();
+      } catch (fetchErr: any) {
+        resJson = { success: false, error: fetchErr.message || 'Network error' };
+      }
+
+      if (!resJson || !resJson.success) {
+        const errMsg = String(resJson?.error || '');
+        const isQuotaLimit =
+          resJson?.isD1Limit ||
+          errMsg.includes("exceeded D1's free tier daily row read limit") ||
+          errMsg.includes('daily row read limit');
+
+        // Jika terkena kuota limit atau error jaringan, kita berikan fallback data ril
+        if (isQuotaLimit || !resJson) {
+          console.warn('⚠️ Cloudflare D1 rate limit / error, menggunakan data fallback lokal untuk:', this.tableName);
+          let fallbackRows: any[] = [];
+
+          if (this.tableName === 'frames') {
+            fallbackRows = DEFAULT_ACTIVE_FRAMES.map((item, idx) => {
+              const f = item.frame || (item as any);
+              return {
+                id: item.frame_id || item.id,
+                name: f.name || `Frame ${idx + 1}`,
+                event_id: f.event_id || HARDCODED_EVENT_ID,
+                image_url: item.image_url,
+                sort_order: f.sort_order ?? (idx + 1),
+                is_active: 1,
+                category: item.category || 'Umum',
+                created_at: '2026-09-24 10:00:00',
+              };
+            });
+          } else if (this.tableName === 'layouts') {
+            fallbackRows = DEFAULT_LAYOUTS.map((l) => ({
+              id: l.id,
+              name: l.name,
+              photo_count: l.photo_count,
+              slots: JSON.stringify(l.slots),
+              is_active: 1,
+              ratio: l.ratio || '2:3',
+              canvas_width: l.canvas_width || 1200,
+              canvas_height: l.canvas_height || 1800,
+            }));
+          } else if (this.tableName === 'frame_layouts') {
+            fallbackRows = DEFAULT_ACTIVE_FRAMES.map((item) => ({
+              id: item.id,
+              frame_id: item.frame_id || item.id,
+              layout_id: item.layout_id || item.layout?.id || DEFAULT_LAYOUTS[0].id,
+              image_url: item.image_url,
+              category: item.category || 'Umum',
+              layout: item.layout,
+            }));
+          } else if (this.tableName === 'events') {
+            fallbackRows = [
+              {
+                id: HARDCODED_EVENT_ID,
+                name: 'AIM Photobooth',
+                is_active: 1,
+                is_default: 1,
+                default_price: 10000,
+                price: 10000,
+                created_at: new Date().toISOString(),
+                qr_code: HARDCODED_EVENT_ID,
+              },
+            ];
+          }
+
+          if (fallbackRows.length > 0) {
+            if (this.isSingleResult) return { data: fallbackRows[0], error: null };
+            if (this.isMaybeSingleResult) return { data: fallbackRows[0] || null, error: null };
+            return { data: fallbackRows, error: null };
+          }
+        }
+
+        return { data: null, error: { message: resJson?.error || 'D1 Query Error' } };
       }
 
       let rows: any[] = resJson.data || [];
@@ -238,6 +341,12 @@ export class D1QueryBuilder {
           } catch (_) {}
         }
         return copy;
+      });
+
+      // Simpan ke in-memory cache jika query berhasil
+      clientQueryCache.set(cacheKey, {
+        data: rows,
+        timestamp: Date.now(),
       });
 
       if (this.isSingleResult) {
@@ -356,6 +465,7 @@ export class D1InsertBuilder {
         }
       }
 
+      clearClientQueryCache();
       const res = { data: this.data, error: null };
       if (resolve) return resolve(res);
       return res;
@@ -433,6 +543,7 @@ export class D1UpdateBuilder {
       });
 
       const resJson = await response.json();
+      if (resJson.success) clearClientQueryCache();
       const result = resJson.success
         ? { data: [copy], error: null }
         : { data: null, error: { message: resJson.error } };
@@ -496,6 +607,7 @@ export class D1DeleteBuilder {
       });
 
       const resJson = await response.json();
+      if (resJson.success) clearClientQueryCache();
       const result = resJson.success
         ? { data: [{ id: 'deleted' }], error: null }
         : { data: null, error: { message: resJson.error } };

@@ -25,7 +25,7 @@ import {
   Smartphone,
   Printer,
 } from 'lucide-react';
-import { supabase } from '../supabaseClient';
+import { supabase, HARDCODED_EVENT_ID } from '../supabaseClient';
 import { generateUuid } from '../utils/uuid';
 import { fetchEventsMetadata, saveEventMetadata } from '../services/eventMetaService';
 import { isRealEvent } from '../utils/eventFilter';
@@ -131,7 +131,34 @@ export const AdminEvents: React.FC<AdminEventsProps> = ({
 
       if (error) {
         console.warn('Error fetching events:', error.message);
-        setErrorMsg(`Gagal memuat events: ${error.message}`);
+        const isD1Limit =
+          error.message?.includes("exceeded D1's free tier daily row read limit") ||
+          error.message?.includes('daily row read limit');
+        if (isD1Limit) {
+          setErrorMsg(
+            '⚠️ Kuota baca Cloudflare D1 Free Tier hari ini telah habis (reset otomatis pukul 00:00 UTC / 07:00 WIB). Menggunakan data event dari cache lokal.'
+          );
+        } else {
+          setErrorMsg(`Gagal memuat events: ${error.message}`);
+        }
+        if (cachedAdminEvents.length > 0) {
+          setEvents(cachedAdminEvents);
+        } else {
+          setEvents([
+            {
+              id: HARDCODED_EVENT_ID,
+              name: 'AIM Photobooth',
+              is_active: true,
+              is_default: true,
+              default_price: 10000,
+              created_at: new Date().toISOString(),
+              qr_code: HARDCODED_EVENT_ID,
+              harga_digital: 10000,
+              harga_print: 25000,
+              is_free_event: false,
+            } as any,
+          ]);
+        }
       } else if (data) {
         // Filter out any internal diagnostic or config rows
         const cleanedData = (data as AdminEventItem[])

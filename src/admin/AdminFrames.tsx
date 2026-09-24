@@ -33,6 +33,8 @@ import { PhotoboothLayout, LayoutSlot, FrameTheme } from '../types';
 import { AdminEventItem } from './AdminEvents';
 import { invalidateFrameCache, resolveFrameImageUrl } from '../services/frameService';
 import { isRealEvent } from '../utils/eventFilter';
+import { DEFAULT_ACTIVE_FRAMES } from '../data/defaultActiveFrames';
+import { HARDCODED_EVENT_ID } from '../cloudflareClient';
 import {
   FrameCategory,
   DEFAULT_FRAME_CATEGORIES,
@@ -154,8 +156,40 @@ export const AdminFrames: React.FC<AdminFramesProps> = ({ initialSelectedEventId
       const frameCategoryMap = catData?.frameCategoryMap || getFrameCategoriesSync().frameCategoryMap;
 
       if (error) {
-        setErrorMsg(`Gagal memuat frames: ${error.message}`);
-        setFrames([]);
+        const isD1Limit =
+          error.message?.includes("exceeded D1's free tier daily row read limit") ||
+          error.message?.includes('daily row read limit');
+        if (isD1Limit) {
+          setErrorMsg(
+            '⚠️ Kuota baca Cloudflare D1 Free Tier hari ini telah habis (reset otomatis pukul 00:00 UTC / 07:00 WIB). Sistem menggunakan data frame dari cache offline sehingga aplikasi photobooth tetap aktif dan berjalan normal.'
+          );
+        } else {
+          setErrorMsg(`Gagal memuat frames: ${error.message}`);
+        }
+
+        // Jangan kosongkan frame jika ada frame di cache atau DEFAULT_ACTIVE_FRAMES
+        const cachedList = cachedAdminFramesMap.get(selectedEventId || 'all');
+        if (cachedList && cachedList.length > 0) {
+          setFrames(cachedList);
+        } else if (DEFAULT_ACTIVE_FRAMES && DEFAULT_ACTIVE_FRAMES.length > 0) {
+          const fallbackFrames: FrameTheme[] = DEFAULT_ACTIVE_FRAMES.map((item) => {
+            const raw = item.frame || (item as any);
+            return {
+              id: item.frame_id || item.id,
+              name: raw.name || 'Frame Photobooth',
+              event_id: raw.event_id || HARDCODED_EVENT_ID,
+              sort_order: raw.sort_order ?? 1,
+              is_active: raw.is_active ?? true,
+              category: item.category || raw.category || 'Umum',
+              created_at: raw.created_at || new Date().toISOString(),
+              image_url: resolveFrameImageUrl(item.image_url || raw.image_url),
+              slots_count: item.layout?.photo_count || item.layout?.slots?.length || 3,
+              layout: item.layout,
+            };
+          });
+          cachedAdminFramesMap.set(selectedEventId || 'all', fallbackFrames);
+          setFrames(fallbackFrames);
+        }
       } else if (dbFrames) {
         const layoutMap = new Map<string, PhotoboothLayout>();
         const imageUrlMap = new Map<string, string>();
