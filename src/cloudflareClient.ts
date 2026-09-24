@@ -122,6 +122,9 @@ export class D1QueryBuilder {
             l.name AS _l_name,
             l.photo_count AS _l_photo_count,
             l.slots AS _l_slots,
+            l.ratio AS _l_ratio,
+            l.canvas_width AS _l_canvas_width,
+            l.canvas_height AS _l_canvas_height,
             l.is_active AS _l_is_active,
             l.created_at AS _l_created_at
           FROM frame_layouts fl
@@ -194,7 +197,10 @@ export class D1QueryBuilder {
             layoutObj = {
               id: row._l_id,
               name: row._l_name,
-              photo_count: row._l_photo_count,
+              photo_count: row._l_photo_count || (parsedSlots ? parsedSlots.length : 3),
+              ratio: row._l_ratio || '2:3',
+              canvas_width: row._l_canvas_width || 1200,
+              canvas_height: row._l_canvas_height || 1800,
               slots: parsedSlots,
               is_active: Boolean(row._l_is_active),
               created_at: row._l_created_at,
@@ -205,6 +211,9 @@ export class D1QueryBuilder {
             _l_name,
             _l_photo_count,
             _l_slots,
+            _l_ratio,
+            _l_canvas_width,
+            _l_canvas_height,
             _l_is_active,
             _l_created_at,
             ...rest
@@ -294,6 +303,11 @@ export class D1InsertBuilder {
 
       for (const item of this.data) {
         const copy = { ...item };
+        if (!copy.id && ['layouts', 'frame_layouts', 'frames', 'events', 'orders', 'sessions'].includes(this.tableName)) {
+          const generatedId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : (`id_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`);
+          copy.id = generatedId;
+          item.id = generatedId;
+        }
         if (this.tableName === 'events' && 'default_price' in copy && !('price' in copy)) {
           copy.price = copy.default_price;
           delete copy.default_price;

@@ -442,7 +442,7 @@ export const AdminFrames: React.FC<AdminFramesProps> = ({ initialSelectedEventId
         })),
       };
 
-      let savedLayoutId: string;
+      let savedLayoutId: string = editingFrameId ? '' : generateUuid();
       let savedFrameId: string = editingFrameId || '';
 
       if (editingFrameId) {
@@ -457,14 +457,16 @@ export const AdminFrames: React.FC<AdminFramesProps> = ({ initialSelectedEventId
           savedLayoutId = existingFl[0].layout_id;
           await supabase.from('layouts').update(layoutDataToSave).eq('id', savedLayoutId);
         } else {
+          const newGeneratedLayoutId = generateUuid();
+          savedLayoutId = newGeneratedLayoutId;
           const { data: newL, error: newLErr } = await supabase
             .from('layouts')
-            .insert([layoutDataToSave])
+            .insert([{ id: newGeneratedLayoutId, ...layoutDataToSave }])
             .select();
           if (newLErr || !newL || newL.length === 0) {
             throw new Error(`Gagal menyimpan konfigurasi slot: ${newLErr?.message}`);
           }
-          savedLayoutId = newL[0].id;
+          if (newL[0].id) savedLayoutId = newL[0].id;
         }
 
         // Update row tabel `frames`
@@ -498,6 +500,7 @@ export const AdminFrames: React.FC<AdminFramesProps> = ({ initialSelectedEventId
         } else {
           await supabase.from('frame_layouts').insert([
             {
+              id: generateUuid(),
               frame_id: editingFrameId,
               layout_id: savedLayoutId,
               image_url: finalImageUrl,
@@ -507,15 +510,17 @@ export const AdminFrames: React.FC<AdminFramesProps> = ({ initialSelectedEventId
       } else {
         // Buat Frame Baru
         // 1. Insert layout
+        const newGeneratedLayoutId = savedLayoutId || generateUuid();
+        savedLayoutId = newGeneratedLayoutId;
         const { data: newLayoutRows, error: layoutErr } = await supabase
           .from('layouts')
-          .insert([layoutDataToSave])
+          .insert([{ id: newGeneratedLayoutId, ...layoutDataToSave }])
           .select();
 
         if (layoutErr || !newLayoutRows || newLayoutRows.length === 0) {
           throw new Error(`Gagal menyimpan layout slot: ${layoutErr?.message}`);
         }
-        savedLayoutId = newLayoutRows[0].id;
+        if (newLayoutRows[0].id) savedLayoutId = newLayoutRows[0].id;
 
         // 2. Insert frame ke tabel `frames`
         const newFrameId = generateUuid();
@@ -536,6 +541,7 @@ export const AdminFrames: React.FC<AdminFramesProps> = ({ initialSelectedEventId
         // 3. Hubungkan ke tabel `frame_layouts`
         const { error: flInsertErr } = await supabase.from('frame_layouts').insert([
           {
+            id: generateUuid(),
             frame_id: newFrameId,
             layout_id: savedLayoutId,
             image_url: finalImageUrl,
