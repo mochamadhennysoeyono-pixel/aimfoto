@@ -19,6 +19,14 @@ const corsHeaders: Record<string, string> = {
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 };
 
+interface CacheEntry {
+  data: any[];
+  meta: any;
+  expiresAt: number;
+}
+const workerQueryCache = new Map<string, CacheEntry>();
+const CACHE_TTL_MS = 60 * 1000; // 60 detik
+
 function base64ToUint8Array(base64: string): Uint8Array {
   const binaryString = atob(base64);
   const len = binaryString.length;
@@ -87,17 +95,92 @@ export default {
 
         const trimmedSql = sql.trim().toUpperCase();
         const isSelect = trimmedSql.startsWith('SELECT') || trimmedSql.startsWith('PRAGMA');
+        const cacheKey = `${sql.trim()}__${JSON.stringify(params || [])}`;
 
         if (isSelect) {
-          const queryResult = await stmt.all();
-          return new Response(
-            JSON.stringify({
-              success: true,
-              data: queryResult.results || [],
-              meta: queryResult.meta || {},
-            }),
-            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
+          const cached = workerQueryCache.get(cacheKey);
+          if (cached && Date.now() < cached.expiresAt) {
+            return new Response(
+              JSON.stringify({
+                success: true,
+                data: cached.data,
+                meta: cached.meta,
+                cached: true,
+              }),
+              {
+                status: 200,
+                headers: {
+                  ...corsHeaders,
+                  'Content-Type': 'application/json',
+                  'X-Cache': 'HIT',
+                  'Cache-Control': 'public, max-age=60',
+                },
+              }
+            );
+          }
+        } else {
+          workerQueryCache.clear();
+        }
+
+        if (isSelect) {
+          try {
+            const queryResult = await stmt.all();
+            const results = queryResult.results || [];
+            const meta = queryResult.meta || {};
+
+            workerQueryCache.set(cacheKey, {
+              data: results,
+              meta,
+              expiresAt: Date.now() + CACHE_TTL_MS,
+            });
+
+            return new Response(
+              JSON.stringify({
+                success: true,
+                data: results,
+                meta,
+              }),
+              {
+                status: 200,
+                headers: {
+                  ...corsHeaders,
+                  'Content-Type': 'application/json',
+                  'X-Cache': 'MISS',
+                  'Cache-Control': 'public, max-age=60',
+                },
+              }
+            );
+          } catch (selErr: any) {
+            const errMsg = String(selErr?.message || '');
+            const isLimit =
+              errMsg.includes("exceeded D1's free tier daily row read limit") ||
+              errMsg.includes('daily row read limit') ||
+              errMsg.includes('D1_ERROR') ||
+              errMsg.includes('midnight UTC');
+
+            const stale = workerQueryCache.get(cacheKey);
+            if (stale && isLimit) {
+              return new Response(
+                JSON.stringify({
+                  success: true,
+                  data: stale.data,
+                  meta: stale.meta,
+                  cached: true,
+                  stale: true,
+                  d1LimitReached: true,
+                }),
+                {
+                  status: 200,
+                  headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                }
+              );
+            }
+
+            return new Response(
+              JSON.stringify({ success: false, isD1Limit: isLimit, error: errMsg }),
+              { status: isLimit ? 429 : 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+          }
         } else {
           const runResult = await stmt.run();
           return new Response(
@@ -110,9 +193,16 @@ export default {
           );
         }
       } catch (err: any) {
+        const errMsg = String(err?.message || 'D1 Query Error');
+        const isLimit =
+          errMsg.includes("exceeded D1's free tier daily row read limit") ||
+          errMsg.includes('daily row read limit') ||
+          errMsg.includes('D1_ERROR') ||
+          errMsg.includes('midnight UTC');
+
         return new Response(
-          JSON.stringify({ success: false, error: err.message || 'D1 Query Error' }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          JSON.stringify({ success: false, isD1Limit: isLimit, error: errMsg }),
+          { status: isLimit ? 429 : 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
     }
