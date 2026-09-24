@@ -449,8 +449,10 @@ export const Step6Slotting: React.FC<Step6SlottingProps> = ({
   };
 
   return (
-    <div className="flex-1 flex flex-col justify-between max-w-lg mx-auto w-full p-2.5 sm:p-4 min-h-0 overflow-y-auto">
-      {/* Header Bar */}
+    <div className="flex-1 flex flex-col min-h-0 h-full max-w-lg mx-auto w-full relative overflow-hidden">
+      {/* Scrollable Content */}
+      <div className="flex-1 min-h-0 overflow-y-auto p-2.5 sm:p-4 space-y-3">
+        {/* Header Bar */}
       <div className="shrink-0">
         <div className="flex items-center justify-between pb-2 border-b border-zinc-800">
           <button
@@ -877,9 +879,10 @@ export const Step6Slotting: React.FC<Step6SlottingProps> = ({
           </div>
         </div>
       </div>
+      </div>
 
-      {/* Sticky Bottom Actions: Lanjut Antar Foto & Selesai */}
-      <div className="sticky bottom-0 z-30 -mx-4 -mb-4 p-3 bg-[#0b0d13]/95 backdrop-blur-md border-t border-zinc-800/80 shadow-[0_-8px_24px_rgba(0,0,0,0.7)] flex items-center gap-2 shrink-0">
+      {/* Docked Bottom Actions: Lanjut Antar Foto & Selesai (Selalu di atas tombol navigasi HP) */}
+      <div className="shrink-0 z-30 w-full p-3 sm:p-4 pb-[max(1rem,calc(env(safe-area-inset-bottom)+0.75rem))] bg-[#0b0d13]/95 backdrop-blur-md border-t border-zinc-800/80 shadow-[0_-8px_24px_rgba(0,0,0,0.7)] flex items-center gap-2">
         {selectedSlotIndex < slots.length - 1 ? (
           <button
             type="button"

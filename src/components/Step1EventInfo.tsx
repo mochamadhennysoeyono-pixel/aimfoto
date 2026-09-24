@@ -89,8 +89,10 @@ export const Step1EventInfo: React.FC<Step1EventInfoProps> = ({
   const paymentAllowed = eventConfig.paymentMethodsAllowed || 'all';
 
   return (
-    <div className="flex-1 flex flex-col justify-between max-w-xl mx-auto w-full p-4 sm:p-5 overflow-y-auto space-y-4">
-      {/* Top Section: Header & Info Event */}
+    <div className="flex-1 flex flex-col min-h-0 h-full max-w-xl mx-auto w-full relative overflow-hidden">
+      {/* Scrollable Event Info Content */}
+      <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-5 space-y-4">
+        {/* Top Section: Header & Info Event */}
       <div className="space-y-3.5">
         {/* Banner Promo / Status Event */}
         {isFreeEvent ? (
@@ -430,9 +432,10 @@ export const Step1EventInfo: React.FC<Step1EventInfoProps> = ({
           </div>
         </div>
       </div>
+      </div>
 
-      {/* Sticky Bottom CTA Button & Legal */}
-      <div className="sticky bottom-0 z-30 -mx-4 -mb-4 p-3 bg-[#0b0d13]/95 backdrop-blur-md border-t border-zinc-800/80 shadow-[0_-8px_24px_rgba(0,0,0,0.7)] space-y-2">
+      {/* Docked Bottom CTA Button & Legal (Selalu di atas tombol navigasi HP) */}
+      <div className="shrink-0 z-30 w-full p-3 sm:p-4 pb-[max(1rem,calc(env(safe-area-inset-bottom)+0.75rem))] bg-[#0b0d13]/95 backdrop-blur-md border-t border-zinc-800/80 shadow-[0_-8px_24px_rgba(0,0,0,0.7)] space-y-2">
         <button
           id="btn-start-photobooth"
           onClick={onStart}

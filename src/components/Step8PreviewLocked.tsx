@@ -186,8 +186,10 @@ export const Step8PreviewLocked: React.FC<Step8PreviewLockedProps> = ({
   };
 
   return (
-    <div className="flex-1 flex flex-col justify-between max-w-md mx-auto w-full p-4 min-h-0 overflow-y-auto">
-      {/* Top Header */}
+    <div className="flex-1 flex flex-col min-h-0 h-full max-w-md mx-auto w-full relative overflow-hidden">
+      {/* Scrollable Content */}
+      <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3">
+        {/* Top Header */}
       <div className="shrink-0">
         <div className="flex items-center justify-between pb-2 border-b border-zinc-800">
           <button
@@ -374,9 +376,10 @@ export const Step8PreviewLocked: React.FC<Step8PreviewLockedProps> = ({
           </span>
         </div>
       )}
+      </div>
 
-      {/* Sticky Action Button */}
-      <div className="sticky bottom-0 z-30 -mx-4 -mb-4 p-3 bg-[#0b0d13]/95 backdrop-blur-md border-t border-zinc-800/80 shadow-[0_-8px_24px_rgba(0,0,0,0.7)] shrink-0">
+      {/* Docked Action Button (Selalu di atas tombol navigasi HP) */}
+      <div className="shrink-0 z-30 w-full p-3 sm:p-4 pb-[max(1rem,calc(env(safe-area-inset-bottom)+0.75rem))] bg-[#0b0d13]/95 backdrop-blur-md border-t border-zinc-800/80 shadow-[0_-8px_24px_rgba(0,0,0,0.7)]">
         <button
           id="btn-proceed-to-checkout"
           disabled={isLoading || !watermarkedImg}

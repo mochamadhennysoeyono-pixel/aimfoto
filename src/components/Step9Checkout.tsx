@@ -562,7 +562,7 @@ export const Step9Checkout: React.FC<Step9CheckoutProps> = ({
   // JIKA EVENT GRATIS (0rb)
   if (isFreeEvent) {
     return (
-      <div className="flex-1 flex flex-col justify-between max-w-md mx-auto w-full p-4 overflow-y-auto space-y-4">
+      <div className="flex-1 flex flex-col justify-between max-w-md mx-auto w-full p-4 overflow-y-auto space-y-4 pb-[max(1.5rem,calc(env(safe-area-inset-bottom)+1.25rem))]">
         <div className="shrink-0 flex items-center justify-between pb-2 border-b border-zinc-800">
           <button
             onClick={onBack}
@@ -625,7 +625,7 @@ export const Step9Checkout: React.FC<Step9CheckoutProps> = ({
 
   // JIKA EVENT BERBAYAR (Toko / Rumahan)
   return (
-    <div className="flex-1 flex flex-col justify-between max-w-lg mx-auto w-full p-4 overflow-y-auto space-y-3">
+    <div className="flex-1 flex flex-col justify-between max-w-lg mx-auto w-full p-4 overflow-y-auto space-y-3 pb-[max(1.5rem,calc(env(safe-area-inset-bottom)+1.25rem))]">
       {/* Header Langkah */}
       <div className="shrink-0">
         <div className="flex items-center justify-between pb-2 border-b border-zinc-800">

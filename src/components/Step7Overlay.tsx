@@ -1387,13 +1387,15 @@ export const Step7Overlay: React.FC<Step7OverlayProps> = ({
       {/* 1. TAMPILAN NORMAL (Toolbar tetap di BAWAH, Canvas proporsional di ATAS) */}
       {/* ========================================================================= */}
       <div
-        className={`flex-1 flex flex-col justify-between max-w-3xl mx-auto w-full p-2 sm:p-4 overflow-y-auto ${
-          isCanvasExpanded ? 'hidden' : 'block'
+        className={`flex-1 flex flex-col min-h-0 h-full max-w-3xl mx-auto w-full relative overflow-hidden ${
+          isCanvasExpanded ? 'hidden' : 'flex'
         }`}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
       >
-        {/* Header Bar */}
+        {/* Scrollable Canvas & Controls Area */}
+        <div className="flex-1 min-h-0 overflow-y-auto p-2 sm:p-4 space-y-3">
+          {/* Header Bar */}
         <div className="mb-2">
           <div className="flex items-center justify-between pb-2 border-b border-zinc-800">
             <button
@@ -1475,9 +1477,10 @@ export const Step7Overlay: React.FC<Step7OverlayProps> = ({
 
         {/* Toolbar / Panel Kustomisasi TETAP DI BAWAH Canvas */}
         <div className="w-full max-w-md mx-auto mb-3">{renderControlPanel()}</div>
+        </div>
 
-        {/* Sticky Bottom Actions Bar */}
-        <div className="sticky bottom-0 z-30 w-full max-w-md mx-auto -mx-2 -mb-2 sm:-mx-3 p-3 bg-[#0b0d13]/95 backdrop-blur-md border-t border-zinc-800/80 shadow-[0_-8px_24px_rgba(0,0,0,0.7)] flex items-center justify-between gap-3">
+        {/* Docked Bottom Actions Bar (Selalu di atas tombol navigasi HP) */}
+        <div className="shrink-0 z-30 w-full max-w-3xl mx-auto p-3 sm:p-4 pb-[max(1rem,calc(env(safe-area-inset-bottom)+0.75rem))] bg-[#0b0d13]/95 backdrop-blur-md border-t border-zinc-800/80 shadow-[0_-8px_24px_rgba(0,0,0,0.7)] flex items-center justify-between gap-3">
           <button
             onClick={onBack}
             className="flex-1 py-3 px-4 rounded-xl border border-zinc-700 bg-zinc-900 hover:bg-zinc-800 text-xs font-semibold text-zinc-300 hover:text-white transition-colors flex items-center justify-center gap-2 cursor-pointer active:scale-[0.99]"
@@ -1583,8 +1586,8 @@ export const Step7Overlay: React.FC<Step7OverlayProps> = ({
             {/* Panel Toolbar Lengkap (Selalu Kelihatan) */}
             {renderControlPanel()}
 
-            {/* Tombol Lanjut di Mode Fullscreen (Sticky di Bawah) */}
-            <div className="sticky bottom-0 z-30 -mx-3 -mb-8 sm:-mx-4 p-3 bg-[#0b0d13]/95 backdrop-blur-md border-t border-zinc-800/80 shadow-[0_-8px_24px_rgba(0,0,0,0.7)] flex items-center justify-between gap-3">
+            {/* Tombol Lanjut di Mode Fullscreen (Docked di Bawah) */}
+            <div className="sticky bottom-0 z-30 -mx-3 -mb-8 sm:-mx-4 p-3 pb-[max(1.25rem,calc(env(safe-area-inset-bottom)+1rem))] bg-[#0b0d13]/95 backdrop-blur-md border-t border-zinc-800/80 shadow-[0_-8px_24px_rgba(0,0,0,0.7)] flex items-center justify-between gap-3">
               <button
                 onClick={() => {
                   setIsCanvasExpanded(false);

@@ -228,6 +228,27 @@ export default function App() {
     };
   }, []);
 
+  // Sinkronisasi tinggi visual viewport real-time untuk mencegah terpotong tombol navigasi HP (Android & iOS)
+  useEffect(() => {
+    const updateViewportHeight = () => {
+      const h = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+      document.documentElement.style.setProperty('--app-height', `${h}px`);
+    };
+    updateViewportHeight();
+    window.addEventListener('resize', updateViewportHeight);
+    window.addEventListener('orientationchange', updateViewportHeight);
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', updateViewportHeight);
+    }
+    return () => {
+      window.removeEventListener('resize', updateViewportHeight);
+      window.removeEventListener('orientationchange', updateViewportHeight);
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', updateViewportHeight);
+      }
+    };
+  }, []);
+
   // Active step in 10-step sequence:
   // 1: event-info
   // 2: theme-select
@@ -874,9 +895,15 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-[#07080c] text-zinc-100 flex flex-col items-center justify-start selection:bg-amber-500 selection:text-zinc-950 font-sans">
+    <div
+      className="bg-[#07080c] text-zinc-100 flex flex-col items-center justify-start selection:bg-amber-500 selection:text-zinc-950 font-sans w-full overflow-hidden"
+      style={{ height: 'var(--app-height, 100dvh)', minHeight: 'var(--app-height, 100dvh)' }}
+    >
       {/* Mobile-first centered phone/kiosk canvas wrapper */}
-      <div className="w-full max-w-lg h-screen flex flex-col bg-[#0b0d13] border-x border-zinc-800/60 shadow-2xl relative overflow-hidden">
+      <div
+        className="w-full max-w-lg flex flex-col bg-[#0b0d13] border-x border-zinc-800/60 shadow-2xl relative overflow-hidden"
+        style={{ height: 'var(--app-height, 100dvh)', maxHeight: 'var(--app-height, 100dvh)' }}
+      >
         {/* Persistent Top Bar */}
         <Navbar
           currentStep={currentStep}
@@ -886,7 +913,7 @@ export default function App() {
         />
 
         {/* Dynamic Step Content */}
-        <main className="flex-1 flex flex-col min-h-0 overflow-y-auto">
+        <main className="flex-1 flex flex-col min-h-0 overflow-hidden relative">
           {/* STEP 1: Info Event */}
           {(currentStep === 'event-info' || currentStep === 'landing') && (
             <Step1EventInfo

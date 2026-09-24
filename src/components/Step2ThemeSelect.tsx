@@ -173,9 +173,9 @@ export const Step2ThemeSelect: React.FC<Step2ThemeSelectProps> = ({
   };
 
   return (
-    <div className="flex-1 flex flex-col justify-between max-w-xl mx-auto w-full relative">
+    <div className="flex-1 flex flex-col min-h-0 h-full max-w-xl mx-auto w-full relative overflow-hidden">
       {/* Scrollable Content Area */}
-      <div className="p-4 md:p-6 pb-28 space-y-4">
+      <div className="flex-1 min-h-0 overflow-y-auto p-4 md:p-6 space-y-4">
         {/* Header Bar */}
         <div>
           <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
@@ -449,8 +449,8 @@ export const Step2ThemeSelect: React.FC<Step2ThemeSelectProps> = ({
       </div>
       </div>
 
-      {/* Bottom CTA Langsung Masuk ke Kamera (STICKY DI PALING BAWAH SEMUA DEVICE) */}
-      <div className="sticky bottom-0 z-30 w-full p-3 sm:p-4 bg-[#0b0d13]/95 backdrop-blur-md border-t border-zinc-800/80 shadow-[0_-12px_32px_rgba(0,0,0,0.85)]">
+      {/* Fixed Docked Bottom CTA Bar (SELALU DI ATAS TOMBOL NAVIGASI HP) */}
+      <div className="shrink-0 z-30 w-full p-3 sm:p-4 pb-[max(1rem,calc(env(safe-area-inset-bottom)+0.75rem))] bg-[#0b0d13]/95 backdrop-blur-md border-t border-zinc-800/80 shadow-[0_-12px_32px_rgba(0,0,0,0.85)]">
         <button
           id="btn-confirm-frame"
           disabled={!activeFrame}
