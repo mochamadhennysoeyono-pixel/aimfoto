@@ -91,6 +91,18 @@ function scheduleSave(): void {
 }
 
 function initSchemaAndSeed(database: Database): void {
+  const d1DumpFile = path.resolve(DATA_DIR, 'd1_export.sql');
+  if (fs.existsSync(d1DumpFile)) {
+    try {
+      const dumpSql = fs.readFileSync(d1DumpFile, 'utf-8');
+      database.run(dumpSql);
+      console.log('✨ Seeded database with genuine Cloudflare D1 export dump!');
+      return;
+    } catch (e) {
+      console.warn('⚠️ Error seeding from d1_export.sql, falling back to manual seed:', e);
+    }
+  }
+
   // Create schema matching Cloudflare D1 tables
   database.run(`
     CREATE TABLE IF NOT EXISTS events (
