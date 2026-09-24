@@ -141,12 +141,14 @@ export class D1QueryBuilder {
           if (f.op === 'IN') {
             const placeholders = f.value.map(() => '?').join(', ');
             whereClauses.push(`${f.column} IN (${placeholders})`);
-            params.push(...f.value);
+            const normalizedIn = f.value.map((v: any) => typeof v === 'boolean' ? (v ? 1 : 0) : v);
+            params.push(...normalizedIn);
           } else if (f.value === null) {
             whereClauses.push(`${f.column} IS NULL`);
           } else {
             whereClauses.push(`${f.column} ${f.op} ?`);
-            params.push(f.value);
+            const normalizedVal = typeof f.value === 'boolean' ? (f.value ? 1 : 0) : f.value;
+            params.push(normalizedVal);
           }
         }
         sql += ` WHERE ${whereClauses.join(' AND ')}`;
@@ -418,7 +420,8 @@ export class D1UpdateBuilder {
         const whereClauses: string[] = [];
         for (const f of this.filters) {
           whereClauses.push(`${f.column} ${f.op} ?`);
-          params.push(f.value);
+          const normalizedVal = typeof f.value === 'boolean' ? (f.value ? 1 : 0) : f.value;
+          params.push(normalizedVal);
         }
         sql += ` WHERE ${whereClauses.join(' AND ')}`;
       }
@@ -475,10 +478,11 @@ export class D1DeleteBuilder {
         const whereClauses = this.filters.map((f) => {
           if (f.op === 'IN') {
             const placeholders = f.value.map(() => '?').join(', ');
-            params.push(...f.value);
+            params.push(...f.value.map((v: any) => (typeof v === 'boolean' ? (v ? 1 : 0) : v)));
             return `${f.column} IN (${placeholders})`;
           } else {
-            params.push(f.value);
+            const normalizedVal = typeof f.value === 'boolean' ? (f.value ? 1 : 0) : f.value;
+            params.push(normalizedVal);
             return `${f.column} ${f.op} ?`;
           }
         });

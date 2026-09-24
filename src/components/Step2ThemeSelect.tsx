@@ -88,7 +88,8 @@ export const Step2ThemeSelect: React.FC<Step2ThemeSelectProps> = ({
   };
 
   useEffect(() => {
-    loadFrames();
+    const hasDummyOnly = frames.length === 1 && (frames[0].id === 'default-strip-3' || frames[0].frame_id === 'default-frame-1');
+    loadFrames(hasDummyOnly);
 
     // Listener realtime jika admin memperbarui frame dari admin portal
     const handleFramesUpdated = () => {

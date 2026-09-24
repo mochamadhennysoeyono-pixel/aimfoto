@@ -47,7 +47,8 @@ export function getCachedFramesSync(eventId?: string): FrameLayoutItem[] | null 
   // 1. Cek memory cache
   const inMemory = memoryCache.get(cacheKey);
   if (inMemory && inMemory.data.length > 0) {
-    return inMemory.data;
+    const isDummy = inMemory.data.length === 1 && (inMemory.data[0].id === 'default-strip-3' || inMemory.data[0].frame_id === 'default-frame-1');
+    if (!isDummy) return inMemory.data;
   }
 
   // 2. Cek localStorage
@@ -56,8 +57,11 @@ export function getCachedFramesSync(eventId?: string): FrameLayoutItem[] | null 
     try {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        memoryCache.set(cacheKey, { data: parsed, timestamp: Date.now() });
-        return parsed;
+        const isDummy = parsed.length === 1 && (parsed[0].id === 'default-strip-3' || parsed[0].frame_id === 'default-frame-1');
+        if (!isDummy) {
+          memoryCache.set(cacheKey, { data: parsed, timestamp: Date.now() });
+          return parsed;
+        }
       }
     } catch (_) {}
   }
@@ -78,7 +82,8 @@ export async function fetchActiveFrames(
 
   // Kembalikan langsung dari RAM jika masih fresh & tidak dipaksa refresh
   if (!forceRefresh && cached && now - cached.timestamp < CACHE_TTL_MS) {
-    return cached.data;
+    const isDummy = cached.data.length === 1 && (cached.data[0].id === 'default-strip-3' || cached.data[0].frame_id === 'default-frame-1');
+    if (!isDummy) return cached.data;
   }
 
   // Cek cache sync untuk fast response

@@ -81,7 +81,8 @@ export default {
 
         let stmt = env.DB.prepare(sql);
         if (Array.isArray(params) && params.length > 0) {
-          stmt = stmt.bind(...params);
+          const normalizedParams = params.map((p) => (typeof p === 'boolean' ? (p ? 1 : 0) : p));
+          stmt = stmt.bind(...normalizedParams);
         }
 
         const trimmedSql = sql.trim().toUpperCase();

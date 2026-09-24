@@ -41,7 +41,7 @@ app.post('/api/d1/query', async (req, res) => {
 
     const payload: any = { sql };
     if (Array.isArray(params) && params.length > 0) {
-      payload.params = params;
+      payload.params = params.map((p) => (typeof p === 'boolean' ? (p ? 1 : 0) : p));
     }
 
     const cfRes = await fetch(
