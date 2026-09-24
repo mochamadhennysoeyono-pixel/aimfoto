@@ -1387,14 +1387,14 @@ export const Step7Overlay: React.FC<Step7OverlayProps> = ({
       {/* 1. TAMPILAN NORMAL (Toolbar tetap di BAWAH, Canvas proporsional di ATAS) */}
       {/* ========================================================================= */}
       <div
-        className={`flex-1 flex flex-col min-h-0 h-full max-w-3xl mx-auto w-full relative overflow-hidden ${
+        className={`flex-1 flex flex-col max-w-3xl mx-auto w-full relative ${
           isCanvasExpanded ? 'hidden' : 'flex'
         }`}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
       >
-        {/* Scrollable Canvas & Controls Area */}
-        <div className="flex-1 min-h-0 overflow-y-auto p-2 sm:p-4 space-y-3">
+        {/* Scrollable Canvas & Controls Area dengan padding bawah */}
+        <div className="p-2 sm:p-4 pb-28 sm:pb-32 space-y-3">
           {/* Header Bar */}
         <div className="mb-2">
           <div className="flex items-center justify-between pb-2 border-b border-zinc-800">
@@ -1479,8 +1479,11 @@ export const Step7Overlay: React.FC<Step7OverlayProps> = ({
         <div className="w-full max-w-md mx-auto mb-3">{renderControlPanel()}</div>
         </div>
 
-        {/* Docked Bottom Actions Bar (Selalu di atas tombol navigasi HP) */}
-        <div className="shrink-0 z-30 w-full max-w-3xl mx-auto p-3 sm:p-4 pb-[max(1rem,calc(env(safe-area-inset-bottom)+0.75rem))] bg-[#0b0d13]/95 backdrop-blur-md border-t border-zinc-800/80 shadow-[0_-8px_24px_rgba(0,0,0,0.7)] flex items-center justify-between gap-3">
+        {/* Bottom Action Bar (Fixed di Bawah Layar Seperti Bottom Nav Menu Admin) */}
+        <div
+          className="fixed bottom-0 left-0 right-0 z-40 max-w-lg mx-auto bg-[#0a0c13]/95 backdrop-blur-xl border-t border-zinc-800/90 shadow-[0_-10px_30px_rgba(0,0,0,0.8)] px-4 py-3 flex items-center justify-between gap-3"
+          style={{ paddingBottom: 'max(0.85rem, env(safe-area-inset-bottom))' }}
+        >
           <button
             onClick={onBack}
             className="flex-1 py-3 px-4 rounded-xl border border-zinc-700 bg-zinc-900 hover:bg-zinc-800 text-xs font-semibold text-zinc-300 hover:text-white transition-colors flex items-center justify-center gap-2 cursor-pointer active:scale-[0.99]"

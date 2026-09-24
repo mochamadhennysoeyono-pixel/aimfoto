@@ -895,15 +895,9 @@ export default function App() {
   }
 
   return (
-    <div
-      className="bg-[#07080c] text-zinc-100 flex flex-col items-center justify-start selection:bg-amber-500 selection:text-zinc-950 font-sans w-full overflow-hidden"
-      style={{ height: 'var(--app-height, 100dvh)', minHeight: 'var(--app-height, 100dvh)' }}
-    >
+    <div className="min-h-screen bg-[#07080c] text-zinc-100 flex flex-col items-center justify-start selection:bg-amber-500 selection:text-zinc-950 font-sans w-full">
       {/* Mobile-first centered phone/kiosk canvas wrapper */}
-      <div
-        className="w-full max-w-lg flex flex-col bg-[#0b0d13] border-x border-zinc-800/60 shadow-2xl relative overflow-hidden"
-        style={{ height: 'var(--app-height, 100dvh)', maxHeight: 'var(--app-height, 100dvh)' }}
-      >
+      <div className="w-full max-w-lg min-h-screen flex flex-col bg-[#0b0d13] border-x border-zinc-800/60 shadow-2xl relative">
         {/* Persistent Top Bar */}
         <Navbar
           currentStep={currentStep}
@@ -913,7 +907,7 @@ export default function App() {
         />
 
         {/* Dynamic Step Content */}
-        <main className="flex-1 flex flex-col min-h-0 overflow-hidden relative">
+        <main className="flex-1 flex flex-col w-full">
           {/* STEP 1: Info Event */}
           {(currentStep === 'event-info' || currentStep === 'landing') && (
             <Step1EventInfo

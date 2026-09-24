@@ -89,11 +89,11 @@ export const Step1EventInfo: React.FC<Step1EventInfoProps> = ({
   const paymentAllowed = eventConfig.paymentMethodsAllowed || 'all';
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 h-full max-w-xl mx-auto w-full relative overflow-hidden">
-      {/* Scrollable Event Info Content */}
-      <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-5 space-y-4">
+    <div className="flex-1 flex flex-col max-w-xl mx-auto w-full relative">
+      {/* Scrollable Event Info Content dengan padding bawah agar tidak tertutup bottom bar */}
+      <div className="p-4 sm:p-5 pb-36 space-y-4">
         {/* Top Section: Header & Info Event */}
-      <div className="space-y-3.5">
+        <div className="space-y-3.5">
         {/* Banner Promo / Status Event */}
         {isFreeEvent ? (
           <div className="p-3 rounded-2xl bg-gradient-to-r from-emerald-500/20 via-teal-500/15 to-emerald-500/20 border border-emerald-500/40 text-center shadow-lg shadow-emerald-500/10 animate-in fade-in">
@@ -434,8 +434,11 @@ export const Step1EventInfo: React.FC<Step1EventInfoProps> = ({
       </div>
       </div>
 
-      {/* Docked Bottom CTA Button & Legal (Selalu di atas tombol navigasi HP) */}
-      <div className="shrink-0 z-30 w-full p-3 sm:p-4 pb-[max(1rem,calc(env(safe-area-inset-bottom)+0.75rem))] bg-[#0b0d13]/95 backdrop-blur-md border-t border-zinc-800/80 shadow-[0_-8px_24px_rgba(0,0,0,0.7)] space-y-2">
+      {/* Bottom Action Bar (Fixed di Bawah Layar Seperti Bottom Nav Menu Admin) */}
+      <div
+        className="fixed bottom-0 left-0 right-0 z-40 max-w-lg mx-auto bg-[#0a0c13]/95 backdrop-blur-xl border-t border-zinc-800/90 shadow-[0_-10px_30px_rgba(0,0,0,0.8)] p-3 sm:p-4 space-y-2"
+        style={{ paddingBottom: 'max(0.85rem, env(safe-area-inset-bottom))' }}
+      >
         <button
           id="btn-start-photobooth"
           onClick={onStart}

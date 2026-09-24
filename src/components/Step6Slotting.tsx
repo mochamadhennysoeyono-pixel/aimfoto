@@ -449,11 +449,11 @@ export const Step6Slotting: React.FC<Step6SlottingProps> = ({
   };
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 h-full max-w-lg mx-auto w-full relative overflow-hidden">
-      {/* Scrollable Content */}
-      <div className="flex-1 min-h-0 overflow-y-auto p-2.5 sm:p-4 space-y-3">
+    <div className="flex-1 flex flex-col max-w-lg mx-auto w-full relative">
+      {/* Scrollable Content dengan padding bawah */}
+      <div className="p-2.5 sm:p-4 pb-28 space-y-3">
         {/* Header Bar */}
-      <div className="shrink-0">
+        <div className="shrink-0">
         <div className="flex items-center justify-between pb-2 border-b border-zinc-800">
           <button
             onClick={onBack}
@@ -881,13 +881,16 @@ export const Step6Slotting: React.FC<Step6SlottingProps> = ({
       </div>
       </div>
 
-      {/* Docked Bottom Actions: Lanjut Antar Foto & Selesai (Selalu di atas tombol navigasi HP) */}
-      <div className="shrink-0 z-30 w-full p-3 sm:p-4 pb-[max(1rem,calc(env(safe-area-inset-bottom)+0.75rem))] bg-[#0b0d13]/95 backdrop-blur-md border-t border-zinc-800/80 shadow-[0_-8px_24px_rgba(0,0,0,0.7)] flex items-center gap-2">
+      {/* Bottom Action Bar (Fixed di Bawah Layar Seperti Bottom Nav Menu Admin) */}
+      <div
+        className="fixed bottom-0 left-0 right-0 z-40 max-w-lg mx-auto bg-[#0a0c13]/95 backdrop-blur-xl border-t border-zinc-800/90 shadow-[0_-10px_30px_rgba(0,0,0,0.8)] p-3 sm:p-4 flex items-center gap-2"
+        style={{ paddingBottom: 'max(0.85rem, env(safe-area-inset-bottom))' }}
+      >
         {selectedSlotIndex < slots.length - 1 ? (
           <button
             type="button"
             onClick={() => handleSelectSlot(selectedSlotIndex + 1)}
-            className="flex-1 py-2.5 px-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer border border-zinc-700 active:scale-[0.99]"
+            className="flex-1 py-3 px-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer border border-zinc-700 active:scale-[0.99]"
           >
             <span>Foto #{selectedSlotIndex + 1} Pas ➔ Lanjut Foto #{selectedSlotIndex + 2}</span>
           </button>
@@ -901,7 +904,7 @@ export const Step6Slotting: React.FC<Step6SlottingProps> = ({
         <button
           id="btn-confirm-slotting"
           onClick={onNext}
-          className="py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-zinc-950 font-bold text-xs shadow-lg shadow-amber-500/20 flex items-center justify-center gap-1.5 transition-all cursor-pointer shrink-0 active:scale-[0.99]"
+          className="py-3 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-zinc-950 font-bold text-xs shadow-lg shadow-amber-500/20 flex items-center justify-center gap-1.5 transition-all cursor-pointer shrink-0 active:scale-[0.99]"
         >
           <span>Selesai: Pasang Bingkai</span>
           <ArrowRight className="w-4 h-4 stroke-[2.5]" />
