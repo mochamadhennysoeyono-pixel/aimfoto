@@ -328,23 +328,23 @@ export default function App() {
         metaMap = fetchedMeta;
         const activeEvents = eventsRes.data || [];
 
-        // 1. Cek default event id yang disimpan di localStorage oleh admin
-        const savedDefaultId = localStorage.getItem('photobooth_default_event_id');
-        if (savedDefaultId) {
-          eventData = activeEvents.find((e) => e.id === savedDefaultId);
-        }
+        // 1. Prioritaskan event yang memiliki is_default = 1 / true di Database Cloud (agar sinkron di semua HP & Kiosk)
+        eventData = activeEvents.find((e) => e.is_default === 1 || e.is_default === true);
 
-        // 2. Cek event yang memiliki is_default = true di database Supabase
+        // 2. Fallback cek default event id yang disimpan di localStorage jika database belum ada yang ditandai default
         if (!eventData) {
-          eventData = activeEvents.find((e) => e.is_default);
+          const savedDefaultId = localStorage.getItem('photobooth_default_event_id');
+          if (savedDefaultId) {
+            eventData = activeEvents.find((e) => e.id === savedDefaultId);
+          }
         }
 
-        // 3. Cek event AIM SPACE utama (HARDCODED_EVENT_ID)
+        // 3. Fallback cek event AIM SPACE utama (HARDCODED_EVENT_ID)
         if (!eventData) {
           eventData = activeEvents.find((e) => e.id === HARDCODED_EVENT_ID);
         }
 
-        // 4. Ambil event aktif pertama yang tersedia
+        // 4. Fallback ambil event aktif pertama yang tersedia
         if (!eventData && activeEvents.length > 0) {
           eventData = activeEvents[0];
         }
@@ -354,7 +354,7 @@ export default function App() {
         // Langsung lakukan pre-fetching frames & preload gambar thumbnail di background
         prefetchFrames(eventData.id);
 
-        // Ambil harga per sesi dari kolom default_price di database Supabase
+        // Ambil harga per sesi dari kolom default_price di database Supabase/D1
         const sessionPrice =
           eventData.default_price !== undefined && eventData.default_price !== null
             ? Number(eventData.default_price)
@@ -363,39 +363,28 @@ export default function App() {
         const eventMeta = metaMap[eventData.id] || {};
         const dynamicLocation = eventMeta.lokasi || (eventData as any).lokasi || 'AIM SPACE Studio';
 
-        // Baca cache lokal yang mungkin sudah diedit admin
-        let localCached: any = {};
-        try {
-          const raw = localStorage.getItem('photobooth_cached_event_config');
-          if (raw) localCached = JSON.parse(raw);
-        } catch (e) {}
-
-        const isSameEventCached = Boolean(localCached && localCached.id === eventData.id);
-
-        const isFree = isSameEventCached && localCached.isFreeEvent !== undefined
-          ? localCached.isFreeEvent
-          : (eventMeta.isFreeEvent ?? (sessionPrice === 0));
+        // Konfigurasi resmi dari Cloud Database (Single Source of Truth untuk semua perangkat & user)
+        const isFree = eventMeta.isFreeEvent !== undefined
+          ? eventMeta.isFreeEvent
+          : (sessionPrice === 0);
 
         const finalHargaDigital = isFree
           ? 0
           : (eventMeta.hargaDigital !== undefined
               ? eventMeta.hargaDigital
-              : (isSameEventCached && localCached.hargaDigital !== undefined
-                  ? localCached.hargaDigital
-                  : sessionPrice));
+              : sessionPrice);
 
         const finalHargaPrint = isFree
           ? 0
           : (eventMeta.hargaPrint !== undefined
               ? eventMeta.hargaPrint
-              : (isSameEventCached && localCached.hargaPrint !== undefined
-                  ? localCached.hargaPrint
-                  : (sessionPrice > 0 ? sessionPrice : 25000)));
+              : (sessionPrice > 0 ? sessionPrice : 25000));
 
-        const finalPackagesAllowed =
-          (isSameEventCached && localCached.packagesAllowed) ||
-          eventMeta.packagesAllowed ||
-          'both';
+        const finalPackagesAllowed = eventMeta.packagesAllowed || 'both';
+        const finalPaymentMethodsAllowed = eventMeta.paymentMethodsAllowed || 'all';
+        const finalPromoBadge = eventMeta.promoBadge !== undefined ? eventMeta.promoBadge : 'Promo Spesial Studio Rumahan';
+        const finalPromoDescription = eventMeta.promoDescription !== undefined ? eventMeta.promoDescription : 'Hasil foto tajam resolusi tinggi 300 DPI, pencahayaan optimal, & cetak instan!';
+        const finalCashInstruction = eventMeta.cashInstruction !== undefined ? eventMeta.cashInstruction : 'Serahkan uang tunai langsung ke kasir atau operator photobooth';
 
         const config: EventConfig = {
           id: eventData.id,
@@ -407,11 +396,11 @@ export default function App() {
           hargaDigital: finalHargaDigital,
           hargaPrint: finalHargaPrint,
           isFreeEvent: isFree,
-          paymentMethodsAllowed: (isSameEventCached && localCached.paymentMethodsAllowed) || eventMeta.paymentMethodsAllowed || 'all',
+          paymentMethodsAllowed: finalPaymentMethodsAllowed,
           packagesAllowed: finalPackagesAllowed,
-          promoBadge: (isSameEventCached && localCached.promoBadge) || eventMeta.promoBadge,
-          promoDescription: (isSameEventCached && localCached.promoDescription) || eventMeta.promoDescription,
-          cashInstruction: (isSameEventCached && localCached.cashInstruction) || eventMeta.cashInstruction,
+          promoBadge: finalPromoBadge,
+          promoDescription: finalPromoDescription,
+          cashInstruction: finalCashInstruction,
           tipeEvent: eventData.tipe || 'Exhibition & Celebration',
         };
 
@@ -428,6 +417,7 @@ export default function App() {
         }));
         setSession((prev) => ({ ...prev, eventId: config.id }));
         localStorage.setItem('photobooth_cached_event_config', JSON.stringify(config));
+        localStorage.setItem('photobooth_default_event_id', config.id);
       } else {
         const cached = localStorage.getItem('photobooth_cached_event_config');
         if (cached && (cached.includes('ADMIN_CONFIG') || cached.includes('__SYSTEM_CONFIG__'))) {

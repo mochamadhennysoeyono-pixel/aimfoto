@@ -19,6 +19,7 @@ import {
   resetAdminPassword,
   isCustomAdminPassword,
   getDefaultAdminPassword,
+  fetchAdminPasswordFromCloud,
 } from '../services/adminAuthService';
 
 export const AdminSetup: React.FC = () => {
@@ -45,9 +46,12 @@ export const AdminSetup: React.FC = () => {
   const [testPasswordInput, setTestPasswordInput] = useState<string>('');
   const [testResult, setTestResult] = useState<'success' | 'fail' | null>(null);
 
-  // Load current password on mount
+  // Load current password on mount (sync from Cloud Database)
   useEffect(() => {
     refreshPasswordState();
+    fetchAdminPasswordFromCloud().then(() => {
+      refreshPasswordState();
+    });
   }, []);
 
   const refreshPasswordState = () => {

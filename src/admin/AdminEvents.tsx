@@ -124,7 +124,7 @@ export const AdminEvents: React.FC<AdminEventsProps> = ({
           .from('events')
           .select('*')
           .order('created_at', { ascending: false }),
-        fetchEventsMetadata(),
+        fetchEventsMetadata(true),
       ]);
 
       const { data, error } = eventsResult;
@@ -142,6 +142,7 @@ export const AdminEvents: React.FC<AdminEventsProps> = ({
           const defaultPr = ev.default_price !== undefined && ev.default_price !== null ? Number(ev.default_price) : 10000;
           return {
             ...ev,
+            is_default: Boolean(ev.is_default),
             lokasi: meta.lokasi || (ev as any).lokasi || '',
             is_free_event: isFree,
             harga_digital: meta.hargaDigital !== undefined ? meta.hargaDigital : (isFree ? 0 : defaultPr),

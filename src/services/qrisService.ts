@@ -50,8 +50,8 @@ export function normalizeQrisUrl(url: string | null | undefined): string | null 
 /**
  * Mengambil konfigurasi QRIS Statis dari cache/localStorage/Supabase
  */
-export async function fetchStaticQrisConfig(): Promise<StaticQrisConfig> {
-  if (cachedQrisConfig) {
+export async function fetchStaticQrisConfig(forceRefresh = false): Promise<StaticQrisConfig> {
+  if (!forceRefresh && cachedQrisConfig) {
     cachedQrisConfig.url = normalizeQrisUrl(cachedQrisConfig.url);
     return cachedQrisConfig;
   }

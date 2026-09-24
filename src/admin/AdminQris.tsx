@@ -46,7 +46,7 @@ export const AdminQris: React.FC = () => {
     setIsLoading(true);
     setErrorMsg(null);
     try {
-      const data = await fetchStaticQrisConfig();
+      const data = await fetchStaticQrisConfig(true);
       setConfig({
         url: data.url || null,
         merchantName: data.merchantName || 'AIM SPACE PHOTOBOOTH',

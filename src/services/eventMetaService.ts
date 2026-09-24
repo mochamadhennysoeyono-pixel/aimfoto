@@ -40,9 +40,9 @@ function safeSetItem(key: string, value: string): void {
 /**
  * Mengambil metadata seluruh event dari Supabase & cache localStorage.
  */
-export async function fetchEventsMetadata(): Promise<Record<string, EventMetadata>> {
-  // Cek cache memory dulu
-  if (cachedMetaMap && Object.keys(cachedMetaMap).length > 0) {
+export async function fetchEventsMetadata(forceRefresh = false): Promise<Record<string, EventMetadata>> {
+  // Cek cache memory dulu jika tidak force refresh
+  if (!forceRefresh && cachedMetaMap && Object.keys(cachedMetaMap).length > 0) {
     return cachedMetaMap;
   }
 

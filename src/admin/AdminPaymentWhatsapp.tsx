@@ -84,7 +84,7 @@ export const AdminPaymentWhatsapp: React.FC = () => {
           .from('events')
           .select('id, name, default_price, is_default, is_active')
           .order('created_at', { ascending: false }),
-        fetchEventsMetadata(),
+        fetchEventsMetadata(true),
         fetchAdminWhatsapp(),
       ]);
 
@@ -101,11 +101,11 @@ export const AdminPaymentWhatsapp: React.FC = () => {
       setEventsList(filteredEvents);
       setAllMetaMap(metaMap);
 
-      // Tentukan event aktif
+      // Tentukan event aktif: Utamakan event default dari Cloud Database
       const defaultIdInStorage = localStorage.getItem('photobooth_default_event_id');
       let activeEv =
-        filteredEvents.find((e) => e.id === defaultIdInStorage) ||
         filteredEvents.find((e) => e.is_default) ||
+        filteredEvents.find((e) => e.id === defaultIdInStorage) ||
         filteredEvents[0] ||
         null;
 
@@ -218,15 +218,19 @@ export const AdminPaymentWhatsapp: React.FC = () => {
         cashInstruction: cashInstruction.trim(),
       });
 
-      // 3. Update default_price di database Supabase untuk event ini
+      // 3. Update default_price, price, dan free_mode di database Supabase/D1 untuk event ini
       if (selectedEventId) {
         try {
           await supabase
             .from('events')
-            .update({ default_price: mainPrice })
+            .update({
+              default_price: mainPrice,
+              price: mainPrice,
+              free_mode: isFreeEvent ? 1 : 0,
+            })
             .eq('id', selectedEventId);
         } catch (dbErr) {
-          console.warn('Gagal update default_price di Supabase:', dbErr);
+          console.warn('Gagal update harga di database:', dbErr);
         }
       }
 
