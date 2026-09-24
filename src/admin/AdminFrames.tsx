@@ -657,11 +657,21 @@ export const AdminFrames: React.FC<AdminFramesProps> = ({ initialSelectedEventId
     setSuccessMsg(null);
 
     try {
-      // 1. Ambil relasi layout_id di frame_layouts untuk dibersihkan
+      // 1. Ambil relasi layout_id dan image_url di frame_layouts untuk dibersihkan
       const { data: flRows } = await supabase
         .from('frame_layouts')
-        .select('layout_id')
+        .select('layout_id, image_url')
         .eq('frame_id', frameToDelete.id);
+
+      // Kumpulkan URL gambar frame untuk dihapus dari Cloudflare R2 Storage
+      const rawImageUrls = new Set<string>();
+      if (frameToDelete.image_url) rawImageUrls.add(frameToDelete.image_url);
+      if (frameToDelete.preview_url) rawImageUrls.add(frameToDelete.preview_url);
+      if (flRows && flRows.length > 0) {
+        flRows.forEach((fl: any) => {
+          if (fl.image_url) rawImageUrls.add(fl.image_url);
+        });
+      }
 
       // 2. Hapus relasi di frame_layouts terlebih dahulu
       const { error: flError } = await supabase
@@ -712,6 +722,33 @@ export const AdminFrames: React.FC<AdminFramesProps> = ({ initialSelectedEventId
             await supabase.from('layouts').delete().eq('id', fl.layout_id);
           }
         }
+      }
+
+      // 5. Hapus file gambar PNG frame dari Cloudflare R2 Storage
+      try {
+        const cleanPaths: string[] = [];
+        for (const raw of rawImageUrls) {
+          if (!raw || raw.startsWith('data:')) continue;
+          const match = raw.match(/photobooth-frames\/frames\/(.+)$/);
+          if (match) {
+            cleanPaths.push(`photobooth-frames/frames/${match[1]}`);
+          } else {
+            const matchSimple = raw.match(/frames\/(.+)$/);
+            if (matchSimple) {
+              cleanPaths.push(`photobooth-frames/frames/${matchSimple[1]}`);
+            }
+          }
+        }
+        if (cleanPaths.length > 0) {
+          await fetch('/api/r2/delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ paths: cleanPaths }),
+          });
+          console.log('Berhasil menghapus file frame dari R2:', cleanPaths);
+        }
+      } catch (storageErr) {
+        console.warn('Catatan hapus gambar frame di storage:', storageErr);
       }
 
       // 5. Berhasil dihapus dari database
