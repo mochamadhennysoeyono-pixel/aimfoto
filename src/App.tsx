@@ -237,6 +237,9 @@ export default function App() {
     updateViewportHeight();
     window.addEventListener('resize', updateViewportHeight);
     window.addEventListener('orientationchange', updateViewportHeight);
+    // Segera mulai prefetch data & preload gambar frame di background sedini mungkin saat app dibuka
+    prefetchFrames();
+
     if (window.visualViewport) {
       window.visualViewport.addEventListener('resize', updateViewportHeight);
     }

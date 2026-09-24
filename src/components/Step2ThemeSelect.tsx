@@ -24,6 +24,8 @@ import { buildWhatsAppUrl } from '../utils/whatsappHelper';
 import {
   fetchActiveFrames,
   getCachedFramesSync,
+  preloadFrameImages,
+  isImagePreloaded,
 } from '../services/frameService';
 import {
   getFrameCategoriesSync,
@@ -272,6 +274,8 @@ const FramePreviewModal: React.FC<FramePreviewModalProps> = ({ item, onClose, on
               src={item.image_url}
               alt={frameName}
               draggable={false}
+              loading="eager"
+              decoding="async"
               className="max-h-[70vh] max-w-[90vw] object-contain drop-shadow-2xl pointer-events-none rounded-lg"
             />
           ) : (
@@ -371,6 +375,25 @@ export const Step2ThemeSelect: React.FC<Step2ThemeSelectProps> = ({
   const [failedThumbnails, setFailedThumbnails] = useState<Record<string, boolean>>({});
   // State untuk modal pratinjau fullscreen frame
   const [modalPreviewItem, setModalPreviewItem] = useState<FrameLayoutItem | null>(null);
+
+  // Status gambar frame yang sudah selesai dimuat agar tidak ada efek tearing dari atas ke bawah
+  const [loadedImages, setLoadedImages] = useState<Record<string, boolean>>(() => {
+    const map: Record<string, boolean> = {};
+    initialCachedFrames.forEach((item) => {
+      const url = item.image_url || item.frame?.image_url;
+      if (url && isImagePreloaded(url)) {
+        map[item.id] = true;
+      }
+    });
+    return map;
+  });
+
+  // Preload gambar secepatnya saat daftar frame dimuat
+  useEffect(() => {
+    if (frames.length > 0) {
+      preloadFrameImages(frames);
+    }
+  }, [frames]);
 
   // Filter Kategori & Search Bar
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
@@ -729,12 +752,27 @@ export const Step2ThemeSelect: React.FC<Step2ThemeSelectProps> = ({
 
                   {/* Frame Visual Preview (Pure Frame Image) */}
                   <div className="relative w-full aspect-[2/3] max-h-64 rounded-xl bg-zinc-950/90 border border-zinc-800/90 overflow-hidden flex items-center justify-center mb-3 p-2 group/frame">
+                    {/* Skeleton Loading Placeholder jika gambar belum siap didecode */}
+                    {item.image_url && !loadedImages[item.id] && !failedThumbnails[item.id] && (
+                      <div className="absolute inset-0 bg-zinc-900/90 animate-pulse flex flex-col items-center justify-center gap-2 z-0">
+                        <div className="w-6 h-6 rounded-full border-2 border-amber-500/20 border-t-amber-400 animate-spin" />
+                        <span className="text-[10px] text-zinc-500 font-mono">Memuat...</span>
+                      </div>
+                    )}
+
                     {/* Gambar Frame Overlay */}
                     {item.image_url && !failedThumbnails[item.id] ? (
                       <img
                         src={item.image_url}
                         alt={item.frame?.name || 'Frame'}
-                        className="w-full h-full object-contain relative z-10 transition-transform duration-300 group-hover:scale-[1.02]"
+                        loading="eager"
+                        decoding="async"
+                        className={`w-full h-full object-contain relative z-10 transition-all duration-200 group-hover:scale-[1.02] ${
+                          loadedImages[item.id] ? 'opacity-100 scale-100' : 'opacity-0 scale-95'
+                        }`}
+                        onLoad={() => {
+                          setLoadedImages((prev) => ({ ...prev, [item.id]: true }));
+                        }}
                         onError={() => setFailedThumbnails((prev) => ({ ...prev, [item.id]: true }))}
                       />
                     ) : (

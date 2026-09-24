@@ -24,16 +24,56 @@ function safeSet(key: string, val: string): void {
   } catch (_) {}
 }
 
+// Set untuk menyimpan URL gambar frame yang sudah didecode ke RAM browser
+export const preloadedImageUrls = new Set<string>();
+
+export function isImagePreloaded(url?: string): boolean {
+  if (!url) return false;
+  return preloadedImageUrls.has(url);
+}
+
 /**
- * Preload frame PNGs into browser cache so they appear instantaneously without blank flickers
+ * Preload dan decode gambar PNG frame langsung ke GPU/RAM browser
+ * Menggunakan <link rel="preload"> prioritas tinggi dan off-thread img.decode()
+ * sehingga gambar langsung muncul seketika secara utuh tanpa proses lambat dari atas ke bawah.
  */
 export function preloadFrameImages(frames: FrameLayoutItem[]): void {
-  if (typeof window === 'undefined') return;
+  if (typeof window === 'undefined' || !frames || frames.length === 0) return;
+
   frames.forEach((f) => {
     const url = f.image_url || f.frame?.image_url;
-    if (url && url.startsWith('http')) {
-      const img = new Image();
-      img.src = url;
+    if (!url || !url.startsWith('http') || preloadedImageUrls.has(url)) return;
+
+    // 1. Injeksi link rel="preload" ke <head> agar browser network scheduler memberi prioritas tinggi
+    try {
+      const existing = document.querySelector(`link[rel="preload"][href="${url}"]`);
+      if (!existing && document.head) {
+        const link = document.createElement('link');
+        link.rel = 'preload';
+        link.as = 'image';
+        link.href = url;
+        document.head.appendChild(link);
+      }
+    } catch (_) {}
+
+    // 2. Decode off-thread menggunakan HTMLImageElement & img.decode()
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.src = url;
+
+    if (typeof (img as any).decode === 'function') {
+      (img as any)
+        .decode()
+        .then(() => {
+          preloadedImageUrls.add(url);
+        })
+        .catch(() => {
+          preloadedImageUrls.add(url);
+        });
+    } else {
+      img.onload = () => {
+        preloadedImageUrls.add(url);
+      };
     }
   });
 }
@@ -248,12 +288,25 @@ export async function fetchActiveFrames(
 }
 
 /**
- * Prefetch frame data dan gambar thumbnail di background sejak aplikasi baru dibuka
+ * Prefetch frame data dan gambar PNG di background sejak aplikasi baru dibuka
  */
 export function prefetchFrames(eventId?: string): void {
+  // 1. Jika sudah ada data di memory/localStorage, langsung preload gambarnya seketika tanpa jeda
+  const cached = getCachedFramesSync(eventId);
+  if (cached && cached.length > 0) {
+    preloadFrameImages(cached);
+  }
+
+  // 2. Fetch data frame terbaru dari Supabase dan preload gambar-gambarnya
   setTimeout(() => {
-    fetchActiveFrames(eventId, false).catch(() => {});
-  }, 100);
+    fetchActiveFrames(eventId, false)
+      .then((items) => {
+        if (items && items.length > 0) {
+          preloadFrameImages(items);
+        }
+      })
+      .catch(() => {});
+  }, 20);
 }
 
 /**
