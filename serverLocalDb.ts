@@ -276,6 +276,53 @@ function initSchemaAndSeed(database: Database): void {
       [flId, defaultEventId, frameId, layoutId, frameUrl]
     );
   });
+
+  // Seed Frame Categories Config (00000000-0000-0000-0000-000000000006)
+  const defaultCategories = [
+    { id: 'cat-korean', name: 'Korean Photostrip' },
+    { id: 'cat-aesthetic', name: 'Aesthetic & Vintage' },
+    { id: 'cat-minimalist', name: 'Minimalist & Modern' },
+    { id: 'cat-wedding', name: 'Wedding & Romance' },
+    { id: 'cat-birthday', name: 'Birthday & Party' },
+    { id: 'cat-fun', name: 'Fun & Kids' },
+  ];
+
+  const catNames = [
+    'Korean Photostrip',
+    'Aesthetic & Vintage',
+    'Minimalist & Modern',
+    'Wedding & Romance',
+    'Birthday & Party',
+    'Fun & Kids',
+  ];
+
+  const initialCategoryMap: Record<string, string> = {};
+  R2_FRAME_KEYS.forEach((_key, idx) => {
+    const frameId = `r2-frame-${idx + 1}`;
+    initialCategoryMap[frameId] = catNames[idx % catNames.length];
+  });
+
+  const categoryPayload = JSON.stringify({
+    categories: defaultCategories,
+    frameCategoryMap: initialCategoryMap,
+  });
+
+  database.run(
+    `INSERT OR REPLACE INTO events (id, name, qr_code, is_active, created_at) VALUES (?, ?, ?, 0, datetime('now'))`,
+    ['00000000-0000-0000-0000-000000000006', '__FRAME_CATEGORIES_CONFIG__', categoryPayload]
+  );
+
+  // Seed Admin WhatsApp Config (00000000-0000-0000-0000-000000000007)
+  database.run(
+    `INSERT OR REPLACE INTO events (id, name, qr_code, is_active, created_at) VALUES (?, ?, ?, 0, datetime('now'))`,
+    ['00000000-0000-0000-0000-000000000007', '__ADMIN_WHATSAPP_CONFIG__', '6282228031995']
+  );
+
+  // Seed Admin Config (00000000-0000-0000-0000-000000000001)
+  database.run(
+    `INSERT OR REPLACE INTO events (id, name, qr_code, is_active, created_at) VALUES (?, ?, ?, 0, datetime('now'))`,
+    ['00000000-0000-0000-0000-000000000001', '__SYSTEM_CONFIG__', '{"adminWhatsapp":"6282228031995"}']
+  );
 }
 
 export async function executeLocalQuery(sql: string, params: any[] = []): Promise<any[]> {
