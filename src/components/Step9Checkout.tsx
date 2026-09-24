@@ -288,6 +288,7 @@ export const Step9Checkout: React.FC<Step9CheckoutProps> = ({
         id: validOrderId,
         session_id: activeSessionId,
         amount: order.harga,
+        status: status === 'success' ? 'success' : 'pending',
         payment_status: status === 'success' ? 'success' : 'pending',
         payment_method: method,
         payment_reference: paymentRef,

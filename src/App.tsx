@@ -722,6 +722,7 @@ export default function App() {
         id: newOrderId,
         session_id: session.id,
         amount: price,
+        status: isFree || price === 0 ? 'success' : 'pending',
         payment_status: isFree || price === 0 ? 'success' : 'pending',
         payment_method: isFree || price === 0 ? 'Gratis Event' : 'Tunai (Kasir)',
         payment_reference: `ORDER-${newOrderId.slice(0, 8).toUpperCase()}`,
