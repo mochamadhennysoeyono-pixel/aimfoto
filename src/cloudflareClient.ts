@@ -269,13 +269,35 @@ export class D1QueryBuilder {
                 qr_code: HARDCODED_EVENT_ID,
               },
             ];
+          } else if (this.tableName === 'orders') {
+            try {
+              const rawOrders =
+                typeof window !== 'undefined'
+                  ? localStorage.getItem('photobooth_cached_admin_orders') ||
+                    localStorage.getItem('photobooth_cached_orders')
+                  : null;
+              if (rawOrders) {
+                const parsed = JSON.parse(rawOrders);
+                if (Array.isArray(parsed)) fallbackRows = parsed;
+              }
+            } catch (_) {}
+          } else if (this.tableName === 'sessions') {
+            try {
+              const rawSessions =
+                typeof window !== 'undefined'
+                  ? localStorage.getItem('photobooth_cached_sessions')
+                  : null;
+              if (rawSessions) {
+                const parsed = JSON.parse(rawSessions);
+                if (Array.isArray(parsed)) fallbackRows = parsed;
+              }
+            } catch (_) {}
           }
 
-          if (fallbackRows.length > 0) {
-            if (this.isSingleResult) return { data: fallbackRows[0], error: null };
-            if (this.isMaybeSingleResult) return { data: fallbackRows[0] || null, error: null };
-            return { data: fallbackRows, error: null };
-          }
+          // Kembalikan fallback row (bisa array isi atau array kosong) tanpa melempar fatal error
+          if (this.isSingleResult) return { data: fallbackRows[0] || null, error: null };
+          if (this.isMaybeSingleResult) return { data: fallbackRows[0] || null, error: null };
+          return { data: fallbackRows, error: null };
         }
 
         return { data: null, error: { message: resJson?.error || 'D1 Query Error' } };

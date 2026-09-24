@@ -63,8 +63,27 @@ let cachedAdminOrdersEvents: AdminEventItem[] = [];
 let cachedStorageFiles: any[] | null = null;
 let lastStorageFetchTime = 0;
 
+function getInitialCachedOrders(): AdminOrderItem[] {
+  if (cachedAdminOrders && cachedAdminOrders.length > 0) return cachedAdminOrders;
+  try {
+    const raw =
+      typeof window !== 'undefined'
+        ? localStorage.getItem('photobooth_cached_admin_orders') ||
+          localStorage.getItem('photobooth_cached_orders')
+        : null;
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        cachedAdminOrders = parsed;
+        return parsed;
+      }
+    }
+  } catch (_) {}
+  return [];
+}
+
 export const AdminOrders: React.FC = () => {
-  const [orders, setOrders] = useState<AdminOrderItem[]>(cachedAdminOrders);
+  const [orders, setOrders] = useState<AdminOrderItem[]>(getInitialCachedOrders);
   const [events, setEvents] = useState<AdminEventItem[]>(cachedAdminOrdersEvents);
   const [isLoading, setIsLoading] = useState(cachedAdminOrders.length === 0);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -378,7 +397,34 @@ export const AdminOrders: React.FC = () => {
 
       const ordersData = ordersRes.data;
       if (ordersRes.error) {
-        throw new Error(ordersRes.error.message);
+        const isQuotaLimit =
+          ordersRes.error.message?.includes("exceeded D1's free tier daily row read limit") ||
+          ordersRes.error.message?.includes('daily row read limit') ||
+          ordersRes.error.message?.includes('D1_ERROR') ||
+          ordersRes.error.message?.includes('midnight UTC');
+
+        const localOrders = getInitialCachedOrders();
+        if (localOrders && localOrders.length > 0) {
+          setOrders(localOrders);
+          if (isQuotaLimit) {
+            setErrorMsg(
+              '⚠️ Kuota baca Cloudflare D1 Free Tier hari ini telah habis (reset otomatis pukul 00:00 UTC / 07:00 WIB). Menampilkan data transaksi terakhir yang tersimpan di cache lokal.'
+            );
+          } else {
+            setErrorMsg(`Koneksi database bermasalah: ${ordersRes.error.message}. Menampilkan data cache lokal.`);
+          }
+        } else {
+          setOrders([]);
+          if (isQuotaLimit) {
+            setErrorMsg(
+              '⚠️ Kuota baca Cloudflare D1 Free Tier hari ini telah habis (reset otomatis pukul 00:00 UTC / 07:00 WIB). Sistem akan otomatis kembali tersinkronisasi saat kuota di-reset besok pukul 07.00 WIB.'
+            );
+          } else {
+            setErrorMsg(`Gagal memuat data transaksi: ${ordersRes.error.message}`);
+          }
+        }
+        setIsLoading(false);
+        return;
       }
 
       if (ordersData) {
@@ -485,11 +531,40 @@ export const AdminOrders: React.FC = () => {
         const deduplicated = Array.from(uniqueBySession.values());
 
         cachedAdminOrders = deduplicated;
+        try {
+          if (typeof window !== 'undefined' && deduplicated.length > 0) {
+            localStorage.setItem('photobooth_cached_admin_orders', JSON.stringify(deduplicated));
+          }
+        } catch (_) {}
         setOrders(deduplicated);
       }
     } catch (err: any) {
       console.warn('Error fetching orders:', err);
-      setErrorMsg(err.message || 'Gagal memuat data transaksi');
+      const isQuotaLimit =
+        err?.message?.includes("exceeded D1's free tier daily row read limit") ||
+        err?.message?.includes('daily row read limit') ||
+        err?.message?.includes('D1_ERROR') ||
+        err?.message?.includes('midnight UTC');
+
+      const localOrders = getInitialCachedOrders();
+      if (localOrders && localOrders.length > 0) {
+        setOrders(localOrders);
+        if (isQuotaLimit) {
+          setErrorMsg(
+            '⚠️ Kuota baca Cloudflare D1 Free Tier hari ini telah habis (reset otomatis pukul 00:00 UTC / 07:00 WIB). Menampilkan data transaksi terakhir yang tersimpan di cache lokal.'
+          );
+        } else {
+          setErrorMsg(`Notice: ${err.message}. Menampilkan data cache lokal.`);
+        }
+      } else {
+        if (isQuotaLimit) {
+          setErrorMsg(
+            '⚠️ Kuota baca Cloudflare D1 Free Tier hari ini telah habis (reset otomatis pukul 00:00 UTC / 07:00 WIB). Sistem akan otomatis kembali tersinkronisasi saat kuota di-reset besok pukul 07.00 WIB.'
+          );
+        } else {
+          setErrorMsg(err.message || 'Gagal memuat data transaksi');
+        }
+      }
     } finally {
       setIsLoading(false);
     }
@@ -803,11 +878,31 @@ export const AdminOrders: React.FC = () => {
         </div>
       )}
 
-      {/* Error alert */}
+      {/* Error / Warning alert */}
       {errorMsg && (
-        <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-start gap-2.5">
-          <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-400" />
-          <p className="flex-1">{errorMsg}</p>
+        <div
+          className={`p-3.5 rounded-xl border text-xs flex items-start justify-between gap-2.5 ${
+            errorMsg.includes('Cloudflare D1') || errorMsg.includes('cache')
+              ? 'bg-amber-500/10 border-amber-500/30 text-amber-300'
+              : 'bg-rose-500/10 border-rose-500/30 text-rose-300'
+          }`}
+        >
+          <div className="flex items-start gap-2.5 flex-1">
+            <AlertCircle
+              className={`w-4 h-4 shrink-0 mt-0.5 ${
+                errorMsg.includes('Cloudflare D1') || errorMsg.includes('cache')
+                  ? 'text-amber-400'
+                  : 'text-rose-400'
+              }`}
+            />
+            <p className="flex-1 leading-relaxed">{errorMsg}</p>
+          </div>
+          <button
+            onClick={() => setErrorMsg(null)}
+            className="text-zinc-400 hover:text-white p-0.5 rounded transition-colors"
+          >
+            ✕
+          </button>
         </div>
       )}
 

@@ -131,7 +131,9 @@ export const onRequestPost = async (context: { request: Request; env: Env }): Pr
         const errMsg = String(selectErr?.message || '');
         const isQuotaExceeded =
           errMsg.includes("exceeded D1's free tier daily row read limit") ||
-          errMsg.includes('daily row read limit');
+          errMsg.includes('daily row read limit') ||
+          errMsg.includes('D1_ERROR') ||
+          errMsg.includes('midnight UTC');
 
         // Jika terkena limit kuota D1 dan kita punya stale cache di memory, berikan stale cache
         const staleCached = queryCache.get(cacheKey);
@@ -186,7 +188,9 @@ export const onRequestPost = async (context: { request: Request; env: Env }): Pr
     const errMsg = String(err?.message || 'Internal D1 Query Execution Error');
     const isQuotaExceeded =
       errMsg.includes("exceeded D1's free tier daily row read limit") ||
-      errMsg.includes('daily row read limit');
+      errMsg.includes('daily row read limit') ||
+      errMsg.includes('D1_ERROR') ||
+      errMsg.includes('midnight UTC');
 
     return new Response(
       JSON.stringify({
