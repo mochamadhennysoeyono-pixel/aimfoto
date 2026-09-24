@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Sparkles,
   ArrowRight,
@@ -13,6 +13,10 @@ import {
   Search,
   X,
   Tag,
+  Maximize2,
+  ZoomIn,
+  ZoomOut,
+  RotateCcw,
 } from 'lucide-react';
 import { FrameTheme, FrameLayoutItem, PhotoboothLayout, LayoutSlot } from '../types';
 import { getAdminWhatsapp } from '../services/adminContactService';
@@ -25,6 +29,319 @@ import {
   getFrameCategoriesSync,
   fetchFrameCategoriesData,
 } from '../services/frameCategoryService';
+
+interface FramePreviewModalProps {
+  item: FrameLayoutItem;
+  onClose: () => void;
+  onSelect: (item: FrameLayoutItem) => void;
+}
+
+/**
+ * Modal Pratinjau Fullscreen Frame dengan fitur Zoom In / Out tombol,
+ * Reset, Close, dan Pinch-to-Zoom 2 jari di perangkat layar sentuh / HP.
+ */
+const FramePreviewModal: React.FC<FramePreviewModalProps> = ({ item, onClose, onSelect }) => {
+  const [scale, setScale] = useState<number>(1);
+  const [position, setPosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState<boolean>(false);
+
+  // Tracking last tap untuk mobile double-tap zoom
+  const lastTapRef = useRef<number>(0);
+
+  // Ref tracking sentuhan untuk pinch 2 jari & pan 1 jari
+  const touchStateRef = useRef<{
+    initialDist: number;
+    initialScale: number;
+    startX: number;
+    startY: number;
+    initialPosX: number;
+    initialPosY: number;
+  }>({
+    initialDist: 0,
+    initialScale: 1,
+    startX: 0,
+    startY: 0,
+    initialPosX: 0,
+    initialPosY: 0,
+  });
+
+  const mouseDragRef = useRef<{
+    startX: number;
+    startY: number;
+    initialPosX: number;
+    initialPosY: number;
+  }>({
+    startX: 0,
+    startY: 0,
+    initialPosX: 0,
+    initialPosY: 0,
+  });
+
+  // Shortcut keyboard: Escape, +, -, 0
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      } else if (e.key === '+' || e.key === '=') {
+        zoomIn();
+      } else if (e.key === '-' || e.key === '_') {
+        zoomOut();
+      } else if (e.key === '0') {
+        resetZoom();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
+  const zoomIn = () => {
+    setScale((prev) => Math.min(4, Math.round((prev + 0.3) * 10) / 10));
+  };
+
+  const zoomOut = () => {
+    setScale((prev) => {
+      const next = Math.max(0.6, Math.round((prev - 0.3) * 10) / 10);
+      if (next <= 1) {
+        setPosition({ x: 0, y: 0 });
+      }
+      return next;
+    });
+  };
+
+  const resetZoom = () => {
+    setScale(1);
+    setPosition({ x: 0, y: 0 });
+  };
+
+  const handleDoubleTapOrClick = () => {
+    if (scale > 1.2) {
+      resetZoom();
+    } else {
+      setScale(2.2);
+    }
+  };
+
+  // Touch handlers: pinch-to-zoom 2 jari & pan 1 jari saat diperbesar
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 2) {
+      const t1 = e.touches[0];
+      const t2 = e.touches[1];
+      const dist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+      touchStateRef.current = {
+        initialDist: dist,
+        initialScale: scale,
+        startX: (t1.clientX + t2.clientX) / 2,
+        startY: (t1.clientY + t2.clientY) / 2,
+        initialPosX: position.x,
+        initialPosY: position.y,
+      };
+    } else if (e.touches.length === 1) {
+      const now = Date.now();
+      if (now - lastTapRef.current < 300) {
+        handleDoubleTapOrClick();
+        lastTapRef.current = 0;
+        return;
+      }
+      lastTapRef.current = now;
+
+      const t = e.touches[0];
+      touchStateRef.current = {
+        ...touchStateRef.current,
+        startX: t.clientX,
+        startY: t.clientY,
+        initialPosX: position.x,
+        initialPosY: position.y,
+      };
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (e.touches.length === 2) {
+      e.preventDefault();
+      const t1 = e.touches[0];
+      const t2 = e.touches[1];
+      const currentDist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+      if (touchStateRef.current.initialDist > 0) {
+        const factor = currentDist / touchStateRef.current.initialDist;
+        const newScale = Math.min(4, Math.max(0.6, touchStateRef.current.initialScale * factor));
+        setScale(Math.round(newScale * 100) / 100);
+      }
+    } else if (e.touches.length === 1 && scale > 1) {
+      e.preventDefault();
+      const t = e.touches[0];
+      const dx = t.clientX - touchStateRef.current.startX;
+      const dy = t.clientY - touchStateRef.current.startY;
+      setPosition({
+        x: touchStateRef.current.initialPosX + dx,
+        y: touchStateRef.current.initialPosY + dy,
+      });
+    }
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (e.touches.length < 2) {
+      touchStateRef.current.initialDist = 0;
+    }
+  };
+
+  // Mouse handlers untuk interaksi desktop
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (e.button !== 0) return;
+    setIsDragging(true);
+    mouseDragRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      initialPosX: position.x,
+      initialPosY: position.y,
+    };
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging) return;
+    const dx = e.clientX - mouseDragRef.current.startX;
+    const dy = e.clientY - mouseDragRef.current.startY;
+    setPosition({
+      x: mouseDragRef.current.initialPosX + dx,
+      y: mouseDragRef.current.initialPosY + dy,
+    });
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  const slotsCount = item.layout?.photo_count || item.layout?.slots?.length || 3;
+  const frameName = item.frame?.name || 'Frame Photobooth';
+
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-black/95 backdrop-blur-md flex flex-col justify-between select-none animate-in fade-in duration-200"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      {/* Top Header Bar */}
+      <div className="flex items-center justify-between p-3.5 sm:p-4 bg-zinc-950/80 border-b border-zinc-800/80 backdrop-blur-md z-30">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse shrink-0" />
+          <div className="min-w-0">
+            <h3 className="text-sm sm:text-base font-bold text-white truncate">
+              {frameName}
+            </h3>
+            <p className="text-[11px] text-zinc-400 truncate">
+              Rasio {item.layout?.ratio || '2:3'} • {slotsCount} Slot Foto • Skala: {Math.round(scale * 100)}%
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-9 h-9 rounded-full bg-zinc-800/90 hover:bg-zinc-700 text-zinc-300 hover:text-white flex items-center justify-center transition-all cursor-pointer border border-zinc-700/80 active:scale-95 shadow-md"
+            title="Tutup (Esc)"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+      </div>
+
+      {/* Main Interactive Zoom Canvas Area */}
+      <div
+        className="relative flex-1 w-full overflow-hidden flex items-center justify-center p-2 sm:p-6 touch-none"
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+        onDoubleClick={handleDoubleTapOrClick}
+        style={{ cursor: scale > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default' }}
+      >
+        {/* Frame Image Container with Zoom & Pan Transform */}
+        <div
+          className="relative max-w-full max-h-full flex items-center justify-center transition-transform duration-75 will-change-transform"
+          style={{
+            transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
+            transformOrigin: 'center center',
+          }}
+        >
+          {item.image_url ? (
+            <img
+              src={item.image_url}
+              alt={frameName}
+              draggable={false}
+              className="max-h-[70vh] max-w-[90vw] object-contain drop-shadow-2xl pointer-events-none rounded-lg"
+            />
+          ) : (
+            <div className="w-64 h-96 bg-zinc-900 border border-zinc-800 rounded-2xl flex flex-col items-center justify-center text-zinc-500 gap-2 p-4">
+              <Layers className="w-12 h-12 text-amber-400/60" />
+              <p className="text-xs text-zinc-300 font-bold">{frameName}</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Bottom Floating Controls Toolbar */}
+      <div className="p-3 sm:p-4 bg-gradient-to-t from-black via-zinc-950/90 to-transparent flex flex-col items-center gap-2.5 z-30">
+        {/* Helper Hint */}
+        <p className="text-[10px] sm:text-xs text-zinc-400 font-medium text-center">
+          Gunakan 2 jari di HP untuk zoom • Ketuk 2x untuk perbesar • Geser untuk menggeser
+        </p>
+
+        {/* Toolbar Controls */}
+        <div className="flex items-center gap-2.5 flex-wrap justify-center">
+          {/* Zoom Buttons Group */}
+          <div className="flex items-center bg-zinc-900/90 border border-zinc-700/80 rounded-full p-1 shadow-xl backdrop-blur-md">
+            <button
+              type="button"
+              onClick={zoomOut}
+              disabled={scale <= 0.6}
+              className="w-8 h-8 rounded-full hover:bg-zinc-800 text-zinc-300 hover:text-white flex items-center justify-center transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+              title="Perkecil (Zoom Out)"
+            >
+              <ZoomOut className="w-4 h-4" />
+            </button>
+
+            <button
+              type="button"
+              onClick={resetZoom}
+              className="px-2.5 py-1 text-xs font-mono font-bold text-amber-400 hover:text-amber-300 hover:bg-zinc-800/80 rounded-full transition-colors cursor-pointer flex items-center gap-1"
+              title="Reset Zoom ke 100%"
+            >
+              <RotateCcw className="w-3 h-3" />
+              <span>{Math.round(scale * 100)}%</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={zoomIn}
+              disabled={scale >= 4}
+              className="w-8 h-8 rounded-full hover:bg-zinc-800 text-zinc-300 hover:text-white flex items-center justify-center transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+              title="Perbesar (Zoom In)"
+            >
+              <ZoomIn className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Action Button: Pilih Frame Ini */}
+          <button
+            type="button"
+            onClick={() => {
+              onSelect(item);
+              onClose();
+            }}
+            className="px-4 py-2 rounded-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-zinc-950 font-bold text-xs shadow-lg shadow-amber-500/20 flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
+          >
+            <Check className="w-3.5 h-3.5 stroke-[3]" />
+            <span>Pilih Frame Ini</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 interface Step2ThemeSelectProps {
   eventId: string;
@@ -52,6 +369,8 @@ export const Step2ThemeSelect: React.FC<Step2ThemeSelectProps> = ({
     return null;
   });
   const [failedThumbnails, setFailedThumbnails] = useState<Record<string, boolean>>({});
+  // State untuk modal pratinjau fullscreen frame
+  const [modalPreviewItem, setModalPreviewItem] = useState<FrameLayoutItem | null>(null);
 
   // Filter Kategori & Search Bar
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
@@ -409,7 +728,7 @@ export const Step2ThemeSelect: React.FC<Step2ThemeSelectProps> = ({
                   </div>
 
                   {/* Frame Visual Preview (Pure Frame Image) */}
-                  <div className="relative w-full aspect-[2/3] max-h-64 rounded-xl bg-zinc-950/90 border border-zinc-800/90 overflow-hidden flex items-center justify-center mb-3 p-2">
+                  <div className="relative w-full aspect-[2/3] max-h-64 rounded-xl bg-zinc-950/90 border border-zinc-800/90 overflow-hidden flex items-center justify-center mb-3 p-2 group/frame">
                     {/* Gambar Frame Overlay */}
                     {item.image_url && !failedThumbnails[item.id] ? (
                       <img
@@ -428,6 +747,22 @@ export const Step2ThemeSelect: React.FC<Step2ThemeSelectProps> = ({
                           {slotsCount} Slot Foto
                         </span>
                       </div>
+                    )}
+
+                    {/* Tombol Kecil untuk Lihat Penuh / Fullscreen Preview */}
+                    {item.image_url && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setModalPreviewItem(item);
+                        }}
+                        className="absolute bottom-2 right-2 z-20 px-2.5 py-1 rounded-lg bg-zinc-900/90 hover:bg-amber-500 hover:text-zinc-950 text-zinc-300 border border-zinc-700/80 shadow-lg backdrop-blur-md transition-all flex items-center gap-1.5 text-[11px] font-medium cursor-pointer active:scale-95 group-hover/frame:border-amber-500/50"
+                        title="Lihat Penuh (Zoom in & out)"
+                      >
+                        <Maximize2 className="w-3.5 h-3.5" />
+                        <span className="text-[10px] font-semibold">Lihat Penuh</span>
+                      </button>
                     )}
                   </div>
 
@@ -464,6 +799,17 @@ export const Step2ThemeSelect: React.FC<Step2ThemeSelectProps> = ({
           <ArrowRight className="w-4 h-4 stroke-[2.5] shrink-0" />
         </button>
       </div>
+
+      {/* Modal Fullscreen Preview dengan Zoom In / Zoom Out, 2 Jari Pinch HP & Close */}
+      {modalPreviewItem && (
+        <FramePreviewModal
+          item={modalPreviewItem}
+          onClose={() => setModalPreviewItem(null)}
+          onSelect={(itemToSelect) => {
+            handleSelect(itemToSelect);
+          }}
+        />
+      )}
     </div>
   );
 };
