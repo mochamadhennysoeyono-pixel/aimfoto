@@ -1476,11 +1476,11 @@ export const Step7Overlay: React.FC<Step7OverlayProps> = ({
         {/* Toolbar / Panel Kustomisasi TETAP DI BAWAH Canvas */}
         <div className="w-full max-w-md mx-auto mb-3">{renderControlPanel()}</div>
 
-        {/* Bottom Actions Bar */}
-        <div className="w-full max-w-md mx-auto pt-2 border-t border-zinc-800 flex items-center justify-between gap-3">
+        {/* Sticky Bottom Actions Bar */}
+        <div className="sticky bottom-0 z-30 w-full max-w-md mx-auto -mx-2 -mb-2 sm:-mx-3 p-3 bg-[#0b0d13]/95 backdrop-blur-md border-t border-zinc-800/80 shadow-[0_-8px_24px_rgba(0,0,0,0.7)] flex items-center justify-between gap-3">
           <button
             onClick={onBack}
-            className="flex-1 py-3 px-4 rounded-xl border border-zinc-700 bg-zinc-900 hover:bg-zinc-800 text-xs font-semibold text-zinc-300 hover:text-white transition-colors flex items-center justify-center gap-2 cursor-pointer"
+            className="flex-1 py-3 px-4 rounded-xl border border-zinc-700 bg-zinc-900 hover:bg-zinc-800 text-xs font-semibold text-zinc-300 hover:text-white transition-colors flex items-center justify-center gap-2 cursor-pointer active:scale-[0.99]"
           >
             <ArrowLeft className="w-4 h-4" />
             <span>Kembali</span>
@@ -1488,7 +1488,7 @@ export const Step7Overlay: React.FC<Step7OverlayProps> = ({
 
           <button
             onClick={onNext}
-            className="flex-1 py-3 px-4 rounded-xl bg-amber-500 hover:bg-amber-400 text-zinc-950 text-xs font-bold transition-all shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2 cursor-pointer"
+            className="flex-1 py-3 px-4 rounded-xl bg-amber-500 hover:bg-amber-400 text-zinc-950 text-xs font-bold transition-all shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2 cursor-pointer active:scale-[0.99]"
           >
             <span>Lanjut Pratinjau Terkunci</span>
             <ArrowRight className="w-4 h-4" />
@@ -1583,14 +1583,14 @@ export const Step7Overlay: React.FC<Step7OverlayProps> = ({
             {/* Panel Toolbar Lengkap (Selalu Kelihatan) */}
             {renderControlPanel()}
 
-            {/* Tombol Lanjut di Mode Fullscreen */}
-            <div className="pt-2 flex items-center justify-between gap-3">
+            {/* Tombol Lanjut di Mode Fullscreen (Sticky di Bawah) */}
+            <div className="sticky bottom-0 z-30 -mx-3 -mb-8 sm:-mx-4 p-3 bg-[#0b0d13]/95 backdrop-blur-md border-t border-zinc-800/80 shadow-[0_-8px_24px_rgba(0,0,0,0.7)] flex items-center justify-between gap-3">
               <button
                 onClick={() => {
                   setIsCanvasExpanded(false);
                   setZoomScale(1);
                 }}
-                className="py-3 px-5 rounded-xl border border-zinc-700 bg-zinc-900 hover:bg-zinc-800 text-xs font-semibold text-zinc-300 hover:text-white transition-colors cursor-pointer flex items-center gap-1.5"
+                className="py-3 px-5 rounded-xl border border-zinc-700 bg-zinc-900 hover:bg-zinc-800 text-xs font-semibold text-zinc-300 hover:text-white transition-colors cursor-pointer flex items-center gap-1.5 active:scale-[0.99]"
               >
                 <Minimize2 className="w-4 h-4 text-amber-400" />
                 <span>Kembali ke Layar Normal</span>
@@ -1598,7 +1598,7 @@ export const Step7Overlay: React.FC<Step7OverlayProps> = ({
 
               <button
                 onClick={onNext}
-                className="py-3 px-6 rounded-xl bg-amber-500 hover:bg-amber-400 text-zinc-950 text-xs font-bold transition-all shadow-lg shadow-amber-500/20 flex items-center gap-2 cursor-pointer"
+                className="py-3 px-6 rounded-xl bg-amber-500 hover:bg-amber-400 text-zinc-950 text-xs font-bold transition-all shadow-lg shadow-amber-500/20 flex items-center gap-2 cursor-pointer active:scale-[0.99]"
               >
                 <span>Lanjut Pratinjau Terkunci</span>
                 <ArrowRight className="w-4 h-4" />

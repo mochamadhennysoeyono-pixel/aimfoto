@@ -196,12 +196,12 @@ export const Step5Filters: React.FC<Step5FiltersProps> = ({
         </div>
       </div>
 
-      {/* Bottom Actions */}
-      <div className="pt-2 pb-1 border-t border-zinc-800 flex items-center gap-3 shrink-0">
+      {/* Sticky Bottom Actions */}
+      <div className="sticky bottom-0 z-30 -mx-4 -mb-4 p-3 bg-[#0b0d13]/95 backdrop-blur-md border-t border-zinc-800/80 shadow-[0_-8px_24px_rgba(0,0,0,0.7)] flex items-center gap-3 shrink-0">
         <button
           id="btn-confirm-filter"
           onClick={onNext}
-          className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-zinc-950 font-bold text-xs shadow-lg shadow-amber-500/20 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+          className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-zinc-950 font-bold text-xs shadow-lg shadow-amber-500/20 flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-[0.99]"
         >
           <span>Lanjut: Penataan ke Slot</span>
           <ArrowRight className="w-4 h-4 stroke-[2.5]" />

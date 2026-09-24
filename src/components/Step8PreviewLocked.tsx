@@ -375,15 +375,15 @@ export const Step8PreviewLocked: React.FC<Step8PreviewLockedProps> = ({
         </div>
       )}
 
-      {/* Action Button */}
-      <div className="shrink-0 pt-2 pb-1 border-t border-zinc-800">
+      {/* Sticky Action Button */}
+      <div className="sticky bottom-0 z-30 -mx-4 -mb-4 p-3 bg-[#0b0d13]/95 backdrop-blur-md border-t border-zinc-800/80 shadow-[0_-8px_24px_rgba(0,0,0,0.7)] shrink-0">
         <button
           id="btn-proceed-to-checkout"
           disabled={isLoading || !watermarkedImg}
           onClick={() =>
             watermarkedImg && onProceedToCheckout(watermarkedImg, selectedPackage)
           }
-          className={`w-full py-3.5 px-4 rounded-xl font-bold text-sm shadow-xl flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50 ${
+          className={`w-full py-3.5 px-4 rounded-xl font-bold text-sm shadow-xl flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50 active:scale-[0.99] ${
             isFreeEvent
               ? 'bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-zinc-950 shadow-emerald-500/20'
               : 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-zinc-950 shadow-amber-500/20'

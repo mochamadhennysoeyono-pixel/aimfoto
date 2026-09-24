@@ -431,8 +431,8 @@ export const Step1EventInfo: React.FC<Step1EventInfoProps> = ({
         </div>
       </div>
 
-      {/* Bottom CTA Button & Legal */}
-      <div className="pt-2 pb-1 border-t border-zinc-800/80 space-y-2">
+      {/* Sticky Bottom CTA Button & Legal */}
+      <div className="sticky bottom-0 z-30 -mx-4 -mb-4 p-3 bg-[#0b0d13]/95 backdrop-blur-md border-t border-zinc-800/80 shadow-[0_-8px_24px_rgba(0,0,0,0.7)] space-y-2">
         <button
           id="btn-start-photobooth"
           onClick={onStart}

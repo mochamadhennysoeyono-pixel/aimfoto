@@ -173,22 +173,24 @@ export const Step2ThemeSelect: React.FC<Step2ThemeSelectProps> = ({
   };
 
   return (
-    <div className="flex-1 flex flex-col justify-between max-w-xl mx-auto w-full p-4 md:p-6 overflow-y-auto">
-      {/* Header Bar */}
-      <div>
-        <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
-          <button
-            onClick={onBack}
-            className="inline-flex items-center gap-1.5 text-xs text-zinc-400 hover:text-white transition-colors cursor-pointer"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            <span>Kembali ke Info Event</span>
-          </button>
+    <div className="flex-1 flex flex-col justify-between max-w-xl mx-auto w-full relative">
+      {/* Scrollable Content Area */}
+      <div className="p-4 md:p-6 pb-28 space-y-4">
+        {/* Header Bar */}
+        <div>
+          <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
+            <button
+              onClick={onBack}
+              className="inline-flex items-center gap-1.5 text-xs text-zinc-400 hover:text-white transition-colors cursor-pointer"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span>Kembali ke Info Event</span>
+            </button>
 
-          <span className="text-[11px] font-mono text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2.5 py-0.5 rounded-full">
-            Langkah 2: Pilih Frame
-          </span>
-        </div>
+            <span className="text-[11px] font-mono text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2.5 py-0.5 rounded-full">
+              Langkah 2: Pilih Frame
+            </span>
+          </div>
 
         {/* Title Header */}
         <div className="text-center pt-4 pb-3">
@@ -445,22 +447,23 @@ export const Step2ThemeSelect: React.FC<Step2ThemeSelectProps> = ({
           </div>
         )}
       </div>
+      </div>
 
-      {/* Bottom CTA Langsung Masuk ke Kamera */}
-      <div className="pt-4 border-t border-zinc-800 space-y-3">
+      {/* Bottom CTA Langsung Masuk ke Kamera (STICKY DI PALING BAWAH SEMUA DEVICE) */}
+      <div className="sticky bottom-0 z-30 w-full p-3 sm:p-4 bg-[#0b0d13]/95 backdrop-blur-md border-t border-zinc-800/80 shadow-[0_-12px_32px_rgba(0,0,0,0.85)]">
         <button
           id="btn-confirm-frame"
           disabled={!activeFrame}
           onClick={handleProceed}
-          className="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-zinc-950 font-bold text-sm shadow-xl shadow-amber-500/20 flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-zinc-950 font-bold text-sm shadow-xl shadow-amber-500/25 flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.99]"
         >
           <Camera className="w-4 h-4 stroke-[2.5]" />
-          <span>
+          <span className="truncate">
             {activeFrame
               ? `Mulai Foto dengan Frame (${activeFrame.frame?.name || 'Pilihan'})`
               : 'Pilih Frame Terlebih Dahulu'}
           </span>
-          <ArrowRight className="w-4 h-4 stroke-[2.5]" />
+          <ArrowRight className="w-4 h-4 stroke-[2.5] shrink-0" />
         </button>
       </div>
     </div>

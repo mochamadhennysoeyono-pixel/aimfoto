@@ -878,13 +878,13 @@ export const Step6Slotting: React.FC<Step6SlottingProps> = ({
         </div>
       </div>
 
-      {/* Bottom Actions: Lanjut Antar Foto & Selesai */}
-      <div className="pt-2 pb-1 border-t border-zinc-800 flex items-center gap-2 shrink-0">
+      {/* Sticky Bottom Actions: Lanjut Antar Foto & Selesai */}
+      <div className="sticky bottom-0 z-30 -mx-4 -mb-4 p-3 bg-[#0b0d13]/95 backdrop-blur-md border-t border-zinc-800/80 shadow-[0_-8px_24px_rgba(0,0,0,0.7)] flex items-center gap-2 shrink-0">
         {selectedSlotIndex < slots.length - 1 ? (
           <button
             type="button"
             onClick={() => handleSelectSlot(selectedSlotIndex + 1)}
-            className="flex-1 py-2.5 px-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer border border-zinc-700"
+            className="flex-1 py-2.5 px-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer border border-zinc-700 active:scale-[0.99]"
           >
             <span>Foto #{selectedSlotIndex + 1} Pas ➔ Lanjut Foto #{selectedSlotIndex + 2}</span>
           </button>
@@ -898,7 +898,7 @@ export const Step6Slotting: React.FC<Step6SlottingProps> = ({
         <button
           id="btn-confirm-slotting"
           onClick={onNext}
-          className="py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-zinc-950 font-bold text-xs shadow-lg shadow-amber-500/20 flex items-center justify-center gap-1.5 transition-all cursor-pointer shrink-0"
+          className="py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-zinc-950 font-bold text-xs shadow-lg shadow-amber-500/20 flex items-center justify-center gap-1.5 transition-all cursor-pointer shrink-0 active:scale-[0.99]"
         >
           <span>Selesai: Pasang Bingkai</span>
           <ArrowRight className="w-4 h-4 stroke-[2.5]" />
