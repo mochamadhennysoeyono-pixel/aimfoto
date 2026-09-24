@@ -1,0 +1,24 @@
+name = "aimfoto"
+main = "worker.ts"
+compatibility_date = "2024-09-01"
+
+[assets]
+directory = "./dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+run_worker_first = true
+
+# D1 Database Native Binding
+[[d1_databases]]
+binding = "DB"
+database_name = "photobooth-db"
+database_id = "08243251-1bfc-41a3-b398-da83c79be6c8"
+
+# R2 Storage Native Binding
+[[r2_buckets]]
+binding = "STORAGE"
+bucket_name = "photobooth-storage"
+
+# Public Environment Variables
+[vars]
+R2_PUBLIC_URL = "https://pub-9ab796572b1a43ad87628fe9260ddf61.r2.dev"
