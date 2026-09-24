@@ -184,31 +184,39 @@ export async function uploadBoomerangToStorage(
 
 /**
  * Hapus file foto dari Supabase Storage (Bucket 'photos') untuk sesi tertentu.
+ * Menghapus foto HD (.jpg), video boomerang frame (.mp4/.webm), dan seluruh klip video per-slot.
  */
 export async function deleteSessionPhotoFromStorage(
   sessionId: string,
   finalUrl?: string | null
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const pathsToDelete: string[] = [];
+    const pathsToDelete = new Set<string>();
 
-    // Path standar foto
     if (sessionId) {
-      pathsToDelete.push(`sessions/${sessionId}.jpg`);
+      // 1. Tambahkan secara eksplisit seluruh kemungkinan nama file yang dihasilkan sesi ini
+      pathsToDelete.add(`sessions/${sessionId}.jpg`);
+      pathsToDelete.add(`sessions/${sessionId}_frame_boomerang.mp4`);
+      pathsToDelete.add(`sessions/${sessionId}_frame_boomerang.webm`);
+      pathsToDelete.add(`sessions/${sessionId}_boomerang.mp4`);
+      pathsToDelete.add(`sessions/${sessionId}_boomerang.webm`);
 
-      // Cari dan hapus juga file video boomerang sesi ini jika ada
+      // Klip boomerang per slot (slot 1 sampai 8)
+      for (let s = 1; s <= 8; s++) {
+        pathsToDelete.add(`sessions/${sessionId}_boomerang_slot_${s}.mp4`);
+        pathsToDelete.add(`sessions/${sessionId}_boomerang_slot_${s}.webm`);
+      }
+
+      // 2. Query Storage R2 untuk mencari file tambahan apa pun yang berkaitan dengan sessionId
       try {
         const { data: sessionFiles } = await supabase.storage
           .from('photos')
           .list('sessions', { search: sessionId });
 
         if (sessionFiles && sessionFiles.length > 0) {
-          sessionFiles.forEach((file) => {
-            if (file.name.startsWith(sessionId)) {
-              const fullPath = `sessions/${file.name}`;
-              if (!pathsToDelete.includes(fullPath)) {
-                pathsToDelete.push(fullPath);
-              }
+          sessionFiles.forEach((file: any) => {
+            if (file.name && file.name.includes(sessionId)) {
+              pathsToDelete.add(`sessions/${file.name}`);
             }
           });
         }
@@ -217,24 +225,23 @@ export async function deleteSessionPhotoFromStorage(
       }
     }
 
-    // Jika finalUrl mengandung path spesifik
+    // 3. Jika finalUrl mengandung path spesifik
     if (finalUrl) {
       const match = finalUrl.match(/\/photos\/(.+)$/);
       if (match && match[1]) {
         const decoded = decodeURIComponent(match[1]);
-        if (!pathsToDelete.includes(decoded)) {
-          pathsToDelete.push(decoded);
-        }
+        pathsToDelete.add(decoded);
       }
     }
 
-    if (pathsToDelete.length > 0) {
-      const { data, error } = await supabase.storage.from('photos').remove(pathsToDelete);
+    const fileList = Array.from(pathsToDelete);
+    if (fileList.length > 0) {
+      const { data, error } = await supabase.storage.from('photos').remove(fileList);
       if (error) {
         console.warn('Gagal hapus file dari Supabase Storage:', error.message);
         return { success: false, error: error.message };
       }
-      console.log('Berhasil hapus file storage:', pathsToDelete, data);
+      console.log('Berhasil membersihkan file storage untuk sesi:', sessionId, fileList.length, data);
     }
 
     return { success: true };
@@ -245,12 +252,12 @@ export async function deleteSessionPhotoFromStorage(
 }
 
 /**
- * Hapus seluruh file foto yang ada di dalam folder sessions pada bucket 'photos'
+ * Hapus seluruh file foto & video yang ada di dalam folder sessions pada bucket 'photos'
  */
 export async function deleteAllSessionPhotosFromStorage(): Promise<{ success: boolean; count?: number; error?: string }> {
   try {
     // 1. List semua file di dalam folder sessions
-    const { data: files, error: listError } = await supabase.storage.from('photos').list('sessions');
+    const { data: files, error: listError } = await supabase.storage.from('photos').list('sessions', { limit: 1000 });
     if (listError) {
       console.warn('Gagal list file di folder sessions:', listError.message);
       return { success: false, error: listError.message };
@@ -260,15 +267,16 @@ export async function deleteAllSessionPhotosFromStorage(): Promise<{ success: bo
       return { success: true, count: 0 };
     }
 
-    const pathsToDelete = files.map((f) => `sessions/${f.name}`);
-    const { error: removeError } = await supabase.storage.from('photos').remove(pathsToDelete);
-
-    if (removeError) {
-      console.warn('Gagal hapus semua file sessions di storage:', removeError.message);
-      return { success: false, error: removeError.message };
+    const pathsToDelete = files.map((f: any) => `sessions/${f.name}`);
+    
+    // Hapus dalam batch 50 file sekaligus
+    const chunkSize = 50;
+    for (let i = 0; i < pathsToDelete.length; i += chunkSize) {
+      const chunk = pathsToDelete.slice(i, i + chunkSize);
+      await supabase.storage.from('photos').remove(chunk);
     }
 
-    console.log(`Berhasil menghapus ${pathsToDelete.length} file di storage`);
+    console.log(`Berhasil menghapus seluruh ${pathsToDelete.length} file sesi di storage`);
     return { success: true, count: pathsToDelete.length };
   } catch (err: any) {
     console.warn('Error saat hapus semua photo storage:', err);

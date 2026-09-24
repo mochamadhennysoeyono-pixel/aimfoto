@@ -570,7 +570,12 @@ const storageAdapter = {
 
       async remove(filePaths: string[]) {
         try {
-          const paths = filePaths.map((p) => `${bucket}/${p}`.replace(/\/+/g, '/').replace(/^\//, ''));
+          const paths = filePaths.map((p) => {
+            const clean = String(p).replace(/^\/+/, '');
+            // Jika path sudah diawali bucket name, jangan diduplikasi
+            if (clean.startsWith(`${bucket}/`)) return clean;
+            return `${bucket}/${clean}`.replace(/\/+/g, '/');
+          });
           const response = await fetch('/api/r2/delete', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -583,8 +588,36 @@ const storageAdapter = {
         }
       },
 
-      async list(_prefix?: string, _options?: any) {
-        return { data: [], error: null };
+      async list(pathPrefix?: string, options?: { limit?: number; search?: string }) {
+        try {
+          const rawPrefix = pathPrefix ? `${bucket}/${pathPrefix}`.replace(/\/+/g, '/').replace(/^\//, '') : bucket;
+          const searchParam = options?.search ? `&search=${encodeURIComponent(options.search)}` : '';
+          const limitParam = options?.limit ? `&limit=${options.limit}` : '';
+          const response = await fetch(`/api/r2/list?prefix=${encodeURIComponent(rawPrefix)}${searchParam}${limitParam}`);
+          const resJson = await response.json();
+          if (!resJson.success) {
+            return { data: [], error: { message: resJson.error || 'Failed to list files' } };
+          }
+          let items = resJson.objects || [];
+          if (options?.search) {
+            const query = options.search.toLowerCase();
+            items = items.filter((item: any) => item.name.toLowerCase().includes(query));
+          }
+          // Kembalikan objek dengan properti nama file yang ramah Supabase
+          const formatted = items.map((item: any) => {
+            const shortName = item.name.replace(new RegExp(`^${bucket}/`), '').replace(new RegExp(`^${pathPrefix}/`), '');
+            return {
+              name: shortName,
+              id: item.name,
+              metadata: item.metadata,
+              created_at: item.created_at,
+              updated_at: item.updated_at,
+            };
+          });
+          return { data: formatted, error: null };
+        } catch (err: any) {
+          return { data: [], error: { message: err.message } };
+        }
       },
     };
   },

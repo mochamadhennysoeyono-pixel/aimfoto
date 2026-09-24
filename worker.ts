@@ -226,6 +226,41 @@ export default {
       }
     }
 
+    // 4.0b R2 List
+    if (url.pathname === '/api/r2/list' && request.method === 'GET') {
+      try {
+        if (!env.STORAGE) {
+          return new Response(
+            JSON.stringify({ success: false, error: 'R2 binding "STORAGE" is not bound.' }),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        const prefix = (url.searchParams.get('prefix') || '').replace(/^\/+/, '');
+        const limit = Number(url.searchParams.get('limit')) || 1000;
+        const listed = await (env.STORAGE as any).list({ prefix, limit });
+
+        const objects = (listed.objects || []).map((item: any) => ({
+          name: item.key,
+          id: item.key,
+          size: item.size,
+          created_at: item.uploaded,
+          updated_at: item.uploaded,
+          metadata: item.customMetadata,
+        }));
+
+        return new Response(JSON.stringify({ success: true, objects }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      } catch (err: any) {
+        return new Response(
+          JSON.stringify({ success: false, error: err.message || 'R2 List Error' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
     // 4.1 R2 File Proxy / Direct Serving (bypasses ISP blocks, guarantees 100% same-domain access, supports Range & Downloads)
     if (url.pathname.startsWith('/api/r2/file/') && (request.method === 'GET' || request.method === 'HEAD')) {
       try {

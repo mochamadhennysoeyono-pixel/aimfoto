@@ -174,6 +174,40 @@ app.post('/api/r2/delete', async (req, res) => {
   }
 });
 
+// 3b. API R2 List
+app.get('/api/r2/list', async (req, res) => {
+  try {
+    const prefix = String(req.query.prefix || '').replace(/^\/+/, '');
+    const limit = Number(req.query.limit) || 1000;
+    const cfUrl = `https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/r2/buckets/${CLOUDFLARE_R2_BUCKET}/objects?prefix=${encodeURIComponent(prefix)}&per_page=${limit}`;
+
+    const cfRes = await fetch(cfUrl, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${CLOUDFLARE_API_TOKEN}`,
+      },
+    });
+
+    const data = await cfRes.json();
+    if (!data.success) {
+      return res.status(500).json({ success: false, error: data.errors?.[0]?.message || 'Failed to list R2 objects' });
+    }
+
+    const objects = (data.result || []).map((item: any) => ({
+      name: item.key,
+      id: item.key,
+      size: item.size,
+      created_at: item.last_modified,
+      updated_at: item.last_modified,
+      metadata: item.custom_metadata,
+    }));
+
+    return res.json({ success: true, objects });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // 4. API R2 File Streaming / Proxy (Serves R2 files seamlessly in local development & preview)
 app.get('/api/r2/file/*', async (req, res) => {
   try {
