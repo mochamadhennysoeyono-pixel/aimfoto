@@ -255,7 +255,7 @@ function initSchemaAndSeed(database: Database): void {
   R2_FRAME_KEYS.forEach((key, idx) => {
     const frameId = `r2-frame-${idx + 1}`;
     const flId = `r2-fl-${idx + 1}`;
-    const frameUrl = `${R2_PUBLIC_URL}/${key}`;
+    const frameUrl = `/api/r2/file/${key}`;
     const frameName = `Frame Estetik #${idx + 1}`;
 
     // Alternate between layouts based on index

@@ -27,22 +27,47 @@ function safeSet(key: string, val: string): void {
 // Set untuk menyimpan URL gambar frame yang sudah didecode ke RAM browser
 export const preloadedImageUrls = new Set<string>();
 
+/**
+ * Mengubah URL frame R2 mentah menjadi URL proxy internal /api/r2/file
+ * agar memiliki header CORS Access-Control-Allow-Origin: * lengkap dan tidak diblokir browser.
+ */
+export function resolveFrameImageUrl(url?: string): string {
+  if (!url) return '';
+  // Jika sudah relative proxy path
+  if (url.startsWith('/api/r2/file')) return url;
+  // Jika URL mengarah ke domain dev R2 langsung
+  if (url.includes('.r2.dev/')) {
+    const parts = url.split('.r2.dev/');
+    if (parts[1]) {
+      return `/api/r2/file/${parts[1].replace(/^\/+/, '')}`;
+    }
+  }
+  // Jika tersimpan hanya nama path bucket
+  if (url.startsWith('photobooth-frames/') || url.startsWith('photos/')) {
+    return `/api/r2/file/${url}`;
+  }
+  return url;
+}
+
 export function isImagePreloaded(url?: string): boolean {
   if (!url) return false;
-  return preloadedImageUrls.has(url);
+  const resolved = resolveFrameImageUrl(url);
+  return preloadedImageUrls.has(resolved) || preloadedImageUrls.has(url);
 }
 
 /**
  * Preload dan decode gambar PNG frame langsung ke GPU/RAM browser
- * Menggunakan <link rel="preload"> prioritas tinggi dan off-thread img.decode()
+ * Menggunakan link rel="preload" prioritas tinggi dan off-thread img.decode()
  * sehingga gambar langsung muncul seketika secara utuh tanpa proses lambat dari atas ke bawah.
  */
 export function preloadFrameImages(frames: FrameLayoutItem[]): void {
   if (typeof window === 'undefined' || !frames || frames.length === 0) return;
 
   frames.forEach((f) => {
-    const url = f.image_url || f.frame?.image_url;
-    if (!url || !url.startsWith('http') || preloadedImageUrls.has(url)) return;
+    const rawUrl = f.image_url || f.frame?.image_url;
+    if (!rawUrl) return;
+    const url = resolveFrameImageUrl(rawUrl);
+    if (!url || preloadedImageUrls.has(url)) return;
 
     // 1. Injeksi link rel="preload" ke <head> agar browser network scheduler memberi prioritas tinggi
     try {
@@ -57,8 +82,8 @@ export function preloadFrameImages(frames: FrameLayoutItem[]): void {
     } catch (_) {}
 
     // 2. Decode off-thread menggunakan HTMLImageElement & img.decode()
+    // Catatan: Tidak menggunakan crossOrigin='anonymous' pada image biasa agar tidak terhalang CORS
     const img = new Image();
-    img.crossOrigin = 'anonymous';
     img.src = url;
 
     if (typeof (img as any).decode === 'function') {
@@ -209,7 +234,8 @@ export async function fetchActiveFrames(
       if (dbFrames.length > 0) {
         items = dbFrames.map((f: any) => {
           const matchedLayout = layoutMap.get(f.id) || DEFAULT_LAYOUTS[0];
-          const finalImageUrl = imageUrlMap.get(f.id) || f.image_url || '';
+          const rawUrl = imageUrlMap.get(f.id) || f.image_url || '';
+          const finalImageUrl = resolveFrameImageUrl(rawUrl);
           const frameCategory = catMap[f.id] || 'Umum';
           const frameThemeObj: FrameTheme = {
             id: f.id,

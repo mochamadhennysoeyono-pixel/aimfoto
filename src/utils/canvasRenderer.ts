@@ -1,16 +1,28 @@
 import { FilterPreset, FrameLayoutType, PhotoboothLayout, CustomDecorationItem, SlotAdjustment, SlotAdjustmentsMap } from '../types';
 import { getFrameLayout } from '../data/frameLayouts';
+import { resolveFrameImageUrl } from '../services/frameService';
 
 /**
  * Loads an image from a Data URL or URL string into an HTMLImageElement asynchronously.
  */
 export function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
+    const resolvedSrc = resolveFrameImageUrl(src);
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.onload = () => resolve(img);
-    img.onerror = (err) => reject(new Error(`Gagal memuat gambar: ${err}`));
-    img.src = src;
+    img.onerror = (err) => {
+      // Jika terjadi kegagalan CORS, coba muat ulang tanpa crossOrigin
+      if (img.crossOrigin) {
+        const retryImg = new Image();
+        retryImg.onload = () => resolve(retryImg);
+        retryImg.onerror = (retryErr) => reject(new Error(`Gagal memuat gambar: ${retryErr || err}`));
+        retryImg.src = resolvedSrc;
+        return;
+      }
+      reject(new Error(`Gagal memuat gambar: ${err}`));
+    };
+    img.src = resolvedSrc;
   });
 }
 

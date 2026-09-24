@@ -31,7 +31,7 @@ import { supabase } from '../supabaseClient';
 import { generateUuid } from '../utils/uuid';
 import { PhotoboothLayout, LayoutSlot, FrameTheme } from '../types';
 import { AdminEventItem } from './AdminEvents';
-import { invalidateFrameCache } from '../services/frameService';
+import { invalidateFrameCache, resolveFrameImageUrl } from '../services/frameService';
 import { isRealEvent } from '../utils/eventFilter';
 import {
   FrameCategory,
@@ -192,7 +192,7 @@ export const AdminFrames: React.FC<AdminFramesProps> = ({ initialSelectedEventId
 
         const mapped: FrameTheme[] = dbFrames.map((f: any) => {
           const matchedLayout = layoutMap.get(f.id);
-          const finalImageUrl = imageUrlMap.get(f.id) || f.image_url || '';
+          const finalImageUrl = resolveFrameImageUrl(imageUrlMap.get(f.id) || f.image_url || '');
           const frameCat = frameCategoryMap[f.id] || 'Umum';
           return {
             id: f.id,
@@ -1001,7 +1001,7 @@ export const AdminFrames: React.FC<AdminFramesProps> = ({ initialSelectedEventId
                     {/* Gambar Frame */}
                     {frame.image_url ? (
                       <img
-                        src={frame.image_url}
+                        src={resolveFrameImageUrl(frame.image_url)}
                         alt={frame.name}
                         className="w-full h-full object-contain"
                       />
@@ -1375,7 +1375,7 @@ export const AdminFrames: React.FC<AdminFramesProps> = ({ initialSelectedEventId
             {frameToDelete.image_url && (
               <div className="w-full h-32 rounded-xl bg-zinc-950 border border-zinc-800 p-2 flex items-center justify-center overflow-hidden">
                 <img
-                  src={frameToDelete.image_url}
+                  src={resolveFrameImageUrl(frameToDelete.image_url)}
                   alt={frameToDelete.name}
                   className="max-h-full max-w-full object-contain"
                 />

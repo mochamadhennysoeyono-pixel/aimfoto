@@ -26,6 +26,7 @@ import {
   getCachedFramesSync,
   preloadFrameImages,
   isImagePreloaded,
+  resolveFrameImageUrl,
 } from '../services/frameService';
 import {
   getFrameCategoriesSync,
@@ -271,7 +272,7 @@ const FramePreviewModal: React.FC<FramePreviewModalProps> = ({ item, onClose, on
         >
           {item.image_url ? (
             <img
-              src={item.image_url}
+              src={resolveFrameImageUrl(item.image_url)}
               alt={frameName}
               draggable={false}
               loading="eager"
@@ -763,7 +764,7 @@ export const Step2ThemeSelect: React.FC<Step2ThemeSelectProps> = ({
                     {/* Gambar Frame Overlay */}
                     {item.image_url && !failedThumbnails[item.id] ? (
                       <img
-                        src={item.image_url}
+                        src={resolveFrameImageUrl(item.image_url)}
                         alt={item.frame?.name || 'Frame'}
                         loading="eager"
                         decoding="async"
@@ -773,7 +774,15 @@ export const Step2ThemeSelect: React.FC<Step2ThemeSelectProps> = ({
                         onLoad={() => {
                           setLoadedImages((prev) => ({ ...prev, [item.id]: true }));
                         }}
-                        onError={() => setFailedThumbnails((prev) => ({ ...prev, [item.id]: true }))}
+                        onError={(e) => {
+                          const target = e.currentTarget as HTMLImageElement;
+                          const proxyUrl = resolveFrameImageUrl(item.image_url);
+                          if (!target.src.includes('/api/r2/file/') && proxyUrl !== item.image_url) {
+                            target.src = proxyUrl;
+                          } else {
+                            setFailedThumbnails((prev) => ({ ...prev, [item.id]: true }));
+                          }
+                        }}
                       />
                     ) : (
                       <div className="flex flex-col items-center justify-center text-zinc-500 gap-1.5 p-3 text-center relative z-10">
