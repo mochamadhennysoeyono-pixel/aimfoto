@@ -13,6 +13,7 @@ import {
 import { FrameTheme, FrameLayoutItem, PhotoboothLayout, LayoutSlot } from '../types';
 import { supabase } from '../supabaseClient';
 import { DEFAULT_LAYOUTS, compareLayoutNames, normalizeLayout } from '../data/defaultLayouts';
+import { resolveFrameImageUrl } from '../services/frameService';
 
 interface Step3LayoutSelectProps {
   selectedTheme: FrameTheme;
@@ -221,7 +222,7 @@ export const Step3LayoutSelect: React.FC<Step3LayoutSelectProps> = ({
                       {combo.image_url ? (
                         /* Pure Frame Image Overlay */
                         <img
-                          src={combo.image_url}
+                          src={resolveFrameImageUrl(combo.image_url)}
                           alt={layout.name}
                           className="w-full h-full object-contain pointer-events-none"
                           onError={(e) => {

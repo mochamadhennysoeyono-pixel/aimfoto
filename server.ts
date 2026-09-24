@@ -3,6 +3,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
 import dotenv from 'dotenv';
+import { executeLocalQuery, getLocalDb } from './serverLocalDb';
 
 dotenv.config();
 
@@ -26,12 +27,24 @@ const CLOUDFLARE_R2_PUBLIC_URL = (
   process.env.CLOUDFLARE_R2_PUBLIC_URL || 'https://pub-9ab796572b1a43ad87628fe9260ddf61.r2.dev'
 ).replace(/\/$/, '');
 
+// Cache in-memory untuk SELECT query guna mencegah kuota harian D1 habis
+interface CacheEntry {
+  timestamp: number;
+  data: any[];
+  meta: any;
+}
+const selectQueryCache = new Map<string, CacheEntry>();
+const CACHE_TTL_MS = 25000; // 25 detik cache untuk query identik
+
+// Penanda jika D1 daily row read limit sedang habis
+let d1LimitCooldownUntil = 0;
+
 // Middleware parsing
 app.use(express.json({ limit: '60mb' }));
 app.use(express.urlencoded({ extended: true, limit: '60mb' }));
 app.use(express.raw({ limit: '60mb', type: ['image/*', 'application/octet-stream'] }));
 
-// 1. API D1 Query
+// 1. API D1 Query (Dengan Caching Pintar & Fallback SQLite Lokal saat Limit D1 Tercapai)
 app.post('/api/d1/query', async (req, res) => {
   try {
     const { sql, params } = req.body;
@@ -39,39 +52,145 @@ app.post('/api/d1/query', async (req, res) => {
       return res.status(400).json({ success: false, error: 'SQL statement is required' });
     }
 
-    const payload: any = { sql };
-    if (Array.isArray(params) && params.length > 0) {
-      payload.params = params.map((p) => (typeof p === 'boolean' ? (p ? 1 : 0) : p));
-    }
+    const trimmed = String(sql).trim();
+    const isSelect = /^SELECT\b/i.test(trimmed);
+    const normalizedParams = Array.isArray(params)
+      ? params.map((p) => (typeof p === 'boolean' ? (p ? 1 : 0) : p))
+      : [];
 
-    const cfRes = await fetch(
-      `https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/d1/database/${CLOUDFLARE_D1_DATABASE_ID}/query`,
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${CLOUDFLARE_API_TOKEN}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
+    // 1. Cek In-Memory Cache untuk SELECT query
+    const cacheKey = JSON.stringify({ sql: trimmed, params: normalizedParams });
+    if (isSelect) {
+      const cached = selectQueryCache.get(cacheKey);
+      if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+        return res.json({
+          success: true,
+          data: cached.data,
+          meta: { ...cached.meta, fromCache: true },
+        });
       }
-    );
-
-    const data = await cfRes.json();
-    if (!data.success) {
-      const errMsg = data.errors?.[0]?.message || 'D1 query failed';
-      console.warn('D1 Query Error:', errMsg, 'SQL:', sql);
-      return res.status(400).json({ success: false, error: errMsg, errors: data.errors });
     }
 
-    const queryResult = data.result?.[0] || { results: [], success: true };
+    // 2. Jika Cloudflare D1 sedang dalam masa cooldown limit habis, langsung layani dari SQLite lokal
+    const now = Date.now();
+    if (now < d1LimitCooldownUntil) {
+      try {
+        const localRows = await executeLocalQuery(sql, normalizedParams);
+        if (isSelect) {
+          selectQueryCache.set(cacheKey, { timestamp: now, data: localRows, meta: { localFallback: true } });
+        }
+        return res.json({
+          success: true,
+          data: localRows,
+          meta: { localFallback: true, reason: 'D1 limit cooldown active' },
+        });
+      } catch (localErr: any) {
+        console.warn('Local query error during cooldown:', localErr);
+      }
+    }
+
+    // 3. Coba kirim query ke Cloudflare D1
+    let cfSuccess = false;
+    let cfData: any = null;
+
+    try {
+      const payload: any = { sql };
+      if (normalizedParams.length > 0) {
+        payload.params = normalizedParams;
+      }
+
+      const cfRes = await fetch(
+        `https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/d1/database/${CLOUDFLARE_D1_DATABASE_ID}/query`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${CLOUDFLARE_API_TOKEN}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(payload),
+        }
+      );
+
+      cfData = await cfRes.json();
+      cfSuccess = Boolean(cfData.success);
+    } catch (netErr: any) {
+      console.warn('Network error reaching Cloudflare D1:', netErr.message);
+      cfSuccess = false;
+    }
+
+    // 4. Jika query D1 berhasil
+    if (cfSuccess && cfData) {
+      const queryResult = cfData.result?.[0] || { results: [], success: true };
+      const rows = queryResult.results || [];
+
+      // Caching di memory jika SELECT
+      if (isSelect) {
+        selectQueryCache.set(cacheKey, {
+          timestamp: Date.now(),
+          data: rows,
+          meta: queryResult.meta || {},
+        });
+      } else {
+        // Jika write query (INSERT / UPDATE / DELETE), sinkronkan juga ke database lokal
+        executeLocalQuery(sql, normalizedParams).catch(() => {});
+        selectQueryCache.clear();
+      }
+
+      return res.json({
+        success: true,
+        data: rows,
+        meta: queryResult.meta || {},
+      });
+    }
+
+    // 5. Jika query D1 GAGAL (termasuk kuota limit habis: "exceeded D1's free tier daily row read limit")
+    const errMsg = cfData?.errors?.[0]?.message || 'D1 query failed';
+    const isLimitExceeded =
+      errMsg.includes('daily row read limit') ||
+      errMsg.includes('limit') ||
+      cfData?.errors?.[0]?.code === 7500;
+
+    if (isLimitExceeded) {
+      // Aktifkan cooldown 10 menit agar tidak terus-menerus menembak D1 yang sedang terkena limit
+      d1LimitCooldownUntil = Date.now() + 10 * 60 * 1000;
+      console.warn('⚠️ Cloudflare D1 daily read limit reached. Seamlessly serving via local SQLite database.');
+    } else {
+      console.warn('⚠️ D1 Query Error, falling back to local SQLite:', errMsg, 'SQL:', sql);
+    }
+
+    // Eksekusi fallback di SQLite lokal (selalu mengembalikan status 200 dan success: true)
+    const localRows = await executeLocalQuery(sql, normalizedParams);
+
+    if (isSelect) {
+      selectQueryCache.set(cacheKey, {
+        timestamp: Date.now(),
+        data: localRows,
+        meta: { localFallback: true },
+      });
+    } else {
+      selectQueryCache.clear();
+    }
+
     return res.json({
       success: true,
-      data: queryResult.results || [],
-      meta: queryResult.meta || {},
+      data: localRows,
+      meta: {
+        localFallback: true,
+        reason: isLimitExceeded ? 'D1 daily limit exceeded' : errMsg,
+      },
     });
   } catch (err: any) {
-    console.error('D1 Route Handler Error:', err);
-    return res.status(500).json({ success: false, error: err.message || 'Internal Server Error' });
+    console.error('D1 Route Handler Error, attempting local recovery:', err);
+    try {
+      const localRows = await executeLocalQuery(req.body?.sql || '', req.body?.params || []);
+      return res.json({
+        success: true,
+        data: localRows,
+        meta: { localFallback: true, error: err.message },
+      });
+    } catch (_) {
+      return res.status(500).json({ success: false, error: err.message || 'Internal Server Error' });
+    }
   }
 });
 
@@ -280,6 +399,13 @@ app.get('/api/health', (_req, res) => {
 
 // Start server with Vite middleware in dev or static files in prod
 async function startServer() {
+  try {
+    await getLocalDb();
+    console.log('🗄️ Local SQLite database ready for caching and fallback');
+  } catch (dbInitErr) {
+    console.warn('Could not pre-initialize local DB:', dbInitErr);
+  }
+
   const isProd = process.env.NODE_ENV === 'production' || fs.existsSync(path.resolve(__dirname, 'dist'));
 
   if (!isProd && process.env.NODE_ENV !== 'production') {
