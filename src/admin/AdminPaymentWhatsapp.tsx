@@ -23,6 +23,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { getAdminWhatsapp, saveAdminWhatsapp } from '../services/adminContactService';
+import { isRealEvent } from '../utils/eventFilter';
 import { supabase } from '../supabaseClient.js';
 import {
   fetchEventsMetadata,
@@ -88,9 +89,7 @@ export const AdminPaymentWhatsapp: React.FC = () => {
         fetchEventsMetadata(),
       ]);
 
-      const filteredEvents: SimpleEventItem[] = (eventsRes.data || []).filter(
-        (ev) => ev.name && !ev.name.startsWith('__') && ev.name !== 'ADMIN_CONFIG'
-      );
+      const filteredEvents: SimpleEventItem[] = (eventsRes.data || []).filter(isRealEvent);
       cachedPaymentEventsList = filteredEvents;
       cachedPaymentMetaMap = metaMap;
 
@@ -373,7 +372,7 @@ export const AdminPaymentWhatsapp: React.FC = () => {
               onChange={(e) => handleSelectEvent(e.target.value)}
               className="bg-zinc-900 border border-zinc-700 text-white text-xs rounded-xl px-3 py-2 font-medium focus:outline-none focus:border-amber-400 cursor-pointer"
             >
-              {eventsList.map((ev) => (
+              {eventsList.filter(isRealEvent).map((ev) => (
                 <option key={ev.id} value={ev.id}>
                   {ev.name} {ev.is_default ? '★ (Default)' : ''}
                 </option>

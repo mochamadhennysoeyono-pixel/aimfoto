@@ -28,6 +28,7 @@ import {
 import { supabase } from '../supabaseClient';
 import { generateUuid } from '../utils/uuid';
 import { fetchEventsMetadata, saveEventMetadata } from '../services/eventMetaService';
+import { isRealEvent } from '../utils/eventFilter';
 
 export interface AdminEventItem {
   id: string;
@@ -133,15 +134,9 @@ export const AdminEvents: React.FC<AdminEventsProps> = ({
         setErrorMsg(`Gagal memuat events: ${error.message}`);
       } else if (data) {
         // Filter out any internal diagnostic or config rows
-        const cleanedData = (data as AdminEventItem[]).filter(
-          (ev) =>
-            ev.name !== 'ADMIN_CONFIG' &&
-            !ev.name?.toUpperCase().includes('ADMIN_CONFIG') &&
-            !ev.name?.startsWith('__') &&
-            ev.id !== '11111111-2222-3333-4444-555555555555' &&
-            ev.id !== '00000000-0000-0000-0000-000000000001' &&
-            !ev.qr_code?.startsWith('__')
-        ).map((ev) => {
+        const cleanedData = (data as AdminEventItem[])
+          .filter(isRealEvent)
+          .map((ev) => {
           const meta = metaMap[ev.id] || {};
           const isFree = meta.isFreeEvent ?? (ev.default_price === 0);
           const defaultPr = ev.default_price !== undefined && ev.default_price !== null ? Number(ev.default_price) : 10000;

@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import { AdminEventItem } from './AdminEvents';
+import { isRealEvent } from '../utils/eventFilter';
 import {
   deleteSessionPhotoFromStorage,
   deleteAllSessionPhotosFromStorage,
@@ -283,9 +284,7 @@ export const AdminOrders: React.FC = () => {
       rawEvents.forEach((ev) => eventMap.set(ev.id, ev.name));
 
       // Filter out internal system configuration rows (__SYSTEM_CONFIG__, __STATIC_QRIS_CONFIG__, etc.)
-      const realEvents = rawEvents.filter(
-        (ev) => !ev.name?.startsWith('__') && !ev.qr_code?.startsWith('__')
-      );
+      const realEvents = rawEvents.filter(isRealEvent);
       cachedAdminOrdersEvents = realEvents;
       setEvents(realEvents);
 
@@ -876,8 +875,8 @@ export const AdminOrders: React.FC = () => {
               onChange={(e) => setFilterEventId(e.target.value)}
               className="w-full px-3 py-2 rounded-xl bg-zinc-950 border border-zinc-800 text-xs text-white focus:outline-none focus:border-amber-500"
             >
-              <option value="all">Semua Event ({events.length})</option>
-              {events.map((ev) => (
+              <option value="all">Semua Event ({events.filter(isRealEvent).length})</option>
+              {events.filter(isRealEvent).map((ev) => (
                 <option key={ev.id} value={ev.id}>
                   {ev.name}
                 </option>

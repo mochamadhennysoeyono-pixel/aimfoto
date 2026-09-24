@@ -32,6 +32,7 @@ import { generateUuid } from '../utils/uuid';
 import { PhotoboothLayout, LayoutSlot, FrameTheme } from '../types';
 import { AdminEventItem } from './AdminEvents';
 import { invalidateFrameCache } from '../services/frameService';
+import { isRealEvent } from '../utils/eventFilter';
 import {
   FrameCategory,
   DEFAULT_FRAME_CATEGORIES,
@@ -115,8 +116,9 @@ export const AdminFrames: React.FC<AdminFramesProps> = ({ initialSelectedEventId
     try {
       const { data, error } = await supabase.from('events').select('*').order('created_at', { ascending: false });
       if (!error && data) {
-        cachedAdminFramesEvents = data;
-        setEvents(data);
+        const realEvents = data.filter(isRealEvent);
+        cachedAdminFramesEvents = realEvents;
+        setEvents(realEvents);
       }
     } catch (e) {
       console.warn('Gagal fetch events:', e);
@@ -245,7 +247,7 @@ export const AdminFrames: React.FC<AdminFramesProps> = ({ initialSelectedEventId
     setFormEventId(
       selectedEventId && selectedEventId !== 'all'
         ? selectedEventId
-        : events[0]?.id || ''
+        : events.filter(isRealEvent)[0]?.id || ''
     );
     setFormSortOrder(String(frames.length + 1));
     setFormIsActive(true);
@@ -851,7 +853,7 @@ export const AdminFrames: React.FC<AdminFramesProps> = ({ initialSelectedEventId
               className="bg-transparent text-zinc-200 font-medium focus:outline-none cursor-pointer"
             >
               <option value="all" className="bg-zinc-900 text-white">Semua Event</option>
-              {events.map((ev) => (
+              {events.filter(isRealEvent).map((ev) => (
                 <option key={ev.id} value={ev.id} className="bg-zinc-900 text-white">
                   {ev.name}
                 </option>
@@ -1258,7 +1260,7 @@ export const AdminFrames: React.FC<AdminFramesProps> = ({ initialSelectedEventId
                         onChange={(e) => setFormEventId(e.target.value)}
                         className="w-full mt-1 px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-700 text-xs text-white focus:outline-none focus:border-amber-500 cursor-pointer"
                       >
-                        {events.map((ev) => (
+                        {events.filter(isRealEvent).map((ev) => (
                           <option key={ev.id} value={ev.id}>
                             {ev.name}
                           </option>
