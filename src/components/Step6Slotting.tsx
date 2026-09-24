@@ -71,8 +71,8 @@ export const Step6Slotting: React.FC<Step6SlottingProps> = ({
     });
   };
 
-  // Mode tampilan: 'progressive' (foto saat ini + foto sebelumnya yang sudah di-set) atau 'all' (semua foto)
-  const [viewMode, setViewMode] = useState<'progressive' | 'all'>('all');
+  // Mode tampilan: 'progressive' (default: foto saat ini + foto sebelumnya yang sudah disesuaikan) atau 'all' (semua foto)
+  const [viewMode, setViewMode] = useState<'progressive' | 'all'>('progressive');
 
   // Transparansi Frame Slider (0.1 sampai 1.0) - default awal 50% (0.5), bisa disesuaikan user secara bebas
   const [frameOpacity, setFrameOpacity] = useState<number>(0.5);
@@ -530,11 +530,10 @@ export const Step6Slotting: React.FC<Step6SlottingProps> = ({
             const photoSrc = slotAssignments[slotKey] || photos[i] || photos[0];
             const isSelected = selectedSlotIndex === slotKey;
 
-            // Foto tetap tampil jika:
-            // 1. Sedang aktif diedit (isSelected)
-            // 2. Foto sebelumnya yang sudah pernah dibuka / di-set (slotKey <= selectedSlotIndex || visitedSlots.has(slotKey))
-            // 3. Mode 'all' (Semua Foto)
-            const isVisible = viewMode === 'all' || slotKey <= selectedSlotIndex || visitedSlots.has(slotKey);
+            // Foto tampil satu per satu sesuai urutan penyesuaian:
+            // 1. Mode 'all' (Tampilkan Semua Foto)
+            // 2. Mode 'progressive' (Default): hanya slot 0 s/d slot yang sedang aktif disesuaikan (slotKey <= selectedSlotIndex)
+            const isVisible = viewMode === 'all' || slotKey <= selectedSlotIndex;
             if (!isVisible) {
               return null;
             }
