@@ -45,6 +45,9 @@ export const DEFAULT_FRAME_CATEGORY_MAP: Record<string, string> = {
   '18fb22fb-c046-4789-8967-08f2876db8ee': 'Lainya',
   '146111aa-86c0-44ee-9bb6-b2fb4c12a10d': 'Lainya',
   '2c77f003-5c6d-46c2-88f5-e2f6fd603394': 'Lainya',
+  '6471eb67-9fcc-4892-b3ff-e1cbbfbd5192': 'Simple',
+  '01b20fad-5504-429c-be56-d1100f8b1625': 'Simple',
+  'f5cfa915-50cc-4ea0-ac90-83fe39331a89': 'Simple',
 };
 
 export const CATEGORY_CONFIG_ROW_ID = '00000000-0000-0000-0000-000000000006';

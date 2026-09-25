@@ -3154,5 +3154,107 @@ export const DEFAULT_ACTIVE_FRAMES: FrameLayoutItem[] = [
         ]
       }
     }
+  },
+  {
+    "id": "48e48227-4c40-4da0-a8fe-2b41c02b60ed",
+    "frame_id": "6471eb67-9fcc-4892-b3ff-e1cbbfbd5192",
+    "layout_id": "bd9e0ea1-d4a7-4e19-bdb2-0d182defb3f0",
+    "image_url": "/api/r2/file/photobooth-frames/frames/1790353130664_e5bda5db.png",
+    "category": "Simple",
+    "layout": {
+      "id": "bd9e0ea1-d4a7-4e19-bdb2-0d182defb3f0",
+      "name": "Instagram simpel Layout",
+      "ratio": "2:3",
+      "canvas_width": 1200,
+      "canvas_height": 1800,
+      "photo_count": 6,
+      "slots": [
+        { "index": 0, "label": "Foto 1", "x": 10, "y": 7, "width": 80, "height": 26, "borderRadius": 8 },
+        { "index": 1, "label": "Foto 2", "x": 10, "y": 37, "width": 80, "height": 26, "borderRadius": 8 },
+        { "index": 2, "label": "Foto 3", "x": 10, "y": 67, "width": 80, "height": 26, "borderRadius": 8 },
+        { "index": 3, "label": "Foto 4", "x": 10, "y": 54, "width": 80, "height": 14, "borderRadius": 8 },
+        { "index": 4, "label": "Foto 5", "x": 10, "y": 70, "width": 80, "height": 14, "borderRadius": 8 },
+        { "index": 5, "label": "Foto 6", "x": 10, "y": 85, "width": 80, "height": 14, "borderRadius": 8 }
+      ]
+    },
+    "frame": {
+      "id": "6471eb67-9fcc-4892-b3ff-e1cbbfbd5192",
+      "name": "Instagram simpel",
+      "event_id": "f1723176-eaa7-4c1d-bfc9-2c112677bb38",
+      "sort_order": 23,
+      "is_active": true,
+      "category": "Simple",
+      "image_url": "/api/r2/file/photobooth-frames/frames/1790353130664_e5bda5db.png",
+      "slots_count": 6,
+      "created_at": "2026-09-25 16:18:52"
+    }
+  },
+  {
+    "id": "f61f5f8a-838b-4301-8ce2-69a3fbe7c24b",
+    "frame_id": "01b20fad-5504-429c-be56-d1100f8b1625",
+    "layout_id": "9e5f4e2b-bf99-4e42-929a-327bf647f8e1",
+    "image_url": "/api/r2/file/photobooth-frames/frames/1790353157378_0bbdcbe6.png",
+    "category": "Simple",
+    "layout": {
+      "id": "9e5f4e2b-bf99-4e42-929a-327bf647f8e1",
+      "name": "Youtube Simple Layout",
+      "ratio": "2:3",
+      "canvas_width": 1200,
+      "canvas_height": 1800,
+      "photo_count": 6,
+      "slots": [
+        { "index": 0, "label": "Foto 1", "x": 10, "y": 7, "width": 80, "height": 26, "borderRadius": 8 },
+        { "index": 1, "label": "Foto 2", "x": 10, "y": 37, "width": 80, "height": 26, "borderRadius": 8 },
+        { "index": 2, "label": "Foto 3", "x": 10, "y": 67, "width": 80, "height": 26, "borderRadius": 8 },
+        { "index": 3, "label": "Foto 4", "x": 10, "y": 54, "width": 80, "height": 14, "borderRadius": 8 },
+        { "index": 4, "label": "Foto 5", "x": 10, "y": 70, "width": 80, "height": 14, "borderRadius": 8 },
+        { "index": 5, "label": "Foto 6", "x": 10, "y": 85, "width": 80, "height": 14, "borderRadius": 8 }
+      ]
+    },
+    "frame": {
+      "id": "01b20fad-5504-429c-be56-d1100f8b1625",
+      "name": "Youtube Simple",
+      "event_id": "f1723176-eaa7-4c1d-bfc9-2c112677bb38",
+      "sort_order": 24,
+      "is_active": true,
+      "category": "Simple",
+      "image_url": "/api/r2/file/photobooth-frames/frames/1790353157378_0bbdcbe6.png",
+      "slots_count": 6,
+      "created_at": "2026-09-25 16:19:19"
+    }
+  },
+  {
+    "id": "36c5f8e7-08ba-4ac1-aaea-6478e5f85a2d",
+    "frame_id": "f5cfa915-50cc-4ea0-ac90-83fe39331a89",
+    "layout_id": "959861ba-23a6-487a-af2a-e489758b8d47",
+    "image_url": "/api/r2/file/photobooth-frames/frames/1790353193746_4c04fa43.png",
+    "category": "Simple",
+    "layout": {
+      "id": "959861ba-23a6-487a-af2a-e489758b8d47",
+      "name": "Netflix Simple Layout",
+      "ratio": "2:3",
+      "canvas_width": 1200,
+      "canvas_height": 1800,
+      "photo_count": 6,
+      "slots": [
+        { "index": 0, "label": "Foto 1", "x": 10, "y": 7, "width": 80, "height": 26, "borderRadius": 8 },
+        { "index": 1, "label": "Foto 2", "x": 10, "y": 37, "width": 80, "height": 26, "borderRadius": 8 },
+        { "index": 2, "label": "Foto 3", "x": 10, "y": 67, "width": 80, "height": 26, "borderRadius": 8 },
+        { "index": 3, "label": "Foto 4", "x": 10, "y": 54, "width": 80, "height": 14, "borderRadius": 8 },
+        { "index": 4, "label": "Foto 5", "x": 10, "y": 70, "width": 80, "height": 14, "borderRadius": 8 },
+        { "index": 5, "label": "Foto 6", "x": 10, "y": 85, "width": 80, "height": 14, "borderRadius": 8 }
+      ]
+    },
+    "frame": {
+      "id": "f5cfa915-50cc-4ea0-ac90-83fe39331a89",
+      "name": "Netflix Simple",
+      "event_id": "f1723176-eaa7-4c1d-bfc9-2c112677bb38",
+      "sort_order": 25,
+      "is_active": true,
+      "category": "Simple",
+      "image_url": "/api/r2/file/photobooth-frames/frames/1790353193746_4c04fa43.png",
+      "slots_count": 6,
+      "created_at": "2026-09-25 16:19:55"
+    }
   }
 ];

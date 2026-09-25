@@ -431,22 +431,46 @@ export const Step2ThemeSelect: React.FC<Step2ThemeSelectProps> = ({
   };
 
   useEffect(() => {
-    const hasDummyOnly = frames.length === 1 && (frames[0].id === 'default-strip-3' || frames[0].frame_id === 'default-frame-1');
-    loadFrames(hasDummyOnly);
+    // Selalu sinkronkan frame terbaru dari database saat masuk ke Step 2
+    loadFrames(true);
 
-    // Listener realtime jika admin memperbarui frame dari admin portal
-    const handleFramesUpdated = () => {
+    // Listener realtime jika background fetch selesai membawa data baru
+    const handleFramesRefreshed = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      if (customEvent?.detail?.frames && Array.isArray(customEvent.detail.frames)) {
+        const newFrames = customEvent.detail.frames;
+        setFrames(newFrames);
+        setActiveFrame((prev) => {
+          if (prev && newFrames.some((it) => it.frame_id === prev.frame_id)) {
+            return prev;
+          }
+          return newFrames.find((it) => it.frame_id === selectedThemeId) || newFrames[0] || null;
+        });
+      }
+    };
+
+    // Listener jika admin menambah/mengubah frame atau kategori
+    const handleAdminInvalidated = () => {
       loadFrames(true);
     };
 
-    window.addEventListener('photobooth_frames_invalidated', handleFramesUpdated);
-    window.addEventListener('photobooth_frames_refreshed', handleFramesUpdated);
-    window.addEventListener('photobooth_categories_updated', handleFramesUpdated);
+    // Sinkronisasi antar-tab jika admin upload di tab lain
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'photobooth_frames_invalidated_at') {
+        loadFrames(true);
+      }
+    };
+
+    window.addEventListener('photobooth_frames_refreshed', handleFramesRefreshed);
+    window.addEventListener('photobooth_frames_invalidated', handleAdminInvalidated);
+    window.addEventListener('photobooth_categories_updated', handleAdminInvalidated);
+    window.addEventListener('storage', handleStorageChange);
 
     return () => {
-      window.removeEventListener('photobooth_frames_invalidated', handleFramesUpdated);
-      window.removeEventListener('photobooth_frames_refreshed', handleFramesUpdated);
-      window.removeEventListener('photobooth_categories_updated', handleFramesUpdated);
+      window.removeEventListener('photobooth_frames_refreshed', handleFramesRefreshed);
+      window.removeEventListener('photobooth_frames_invalidated', handleAdminInvalidated);
+      window.removeEventListener('photobooth_categories_updated', handleAdminInvalidated);
+      window.removeEventListener('storage', handleStorageChange);
     };
   }, [eventId, selectedThemeId]);
 

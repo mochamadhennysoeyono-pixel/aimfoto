@@ -3,10 +3,16 @@ import { supabase } from '../supabaseClient';
 import { DEFAULT_LAYOUTS } from '../data/defaultLayouts';
 import { DEFAULT_ACTIVE_FRAMES } from '../data/defaultActiveFrames';
 import { getFrameCategoriesSync, fetchFrameCategoriesData } from './frameCategoryService';
+import { clearClientQueryCache } from '../cloudflareClient';
 
 // Memory Cache
-const memoryCache = new Map<string, { data: FrameLayoutItem[]; timestamp: number }>();
-const CACHE_TTL_MS = 60 * 1000; // 60 detik sebelum background revalidation
+interface MemoryCacheEntry {
+  data: FrameLayoutItem[];
+  timestamp: number;
+  isFromServer: boolean;
+}
+const memoryCache = new Map<string, MemoryCacheEntry>();
+const CACHE_TTL_MS = 20 * 1000; // 20 detik sebelum background revalidation jika sudah dari server
 
 // Safe localStorage helper
 function safeGet(key: string): string | null {
@@ -146,7 +152,7 @@ export function getCachedFramesSync(eventId?: string): FrameLayoutItem[] | null 
     try {
       const parsed = JSON.parse(raw);
       if (isValidFrameList(parsed)) {
-        memoryCache.set(cacheKey, { data: parsed, timestamp: Date.now() });
+        memoryCache.set(cacheKey, { data: parsed, timestamp: 0, isFromServer: false });
         return parsed;
       }
     } catch (_) {}
@@ -159,16 +165,16 @@ export function getCachedFramesSync(eventId?: string): FrameLayoutItem[] | null 
       try {
         const parsedAll = JSON.parse(rawAll);
         if (isValidFrameList(parsedAll)) {
-          memoryCache.set(cacheKey, { data: parsedAll, timestamp: Date.now() });
+          memoryCache.set(cacheKey, { data: parsedAll, timestamp: 0, isFromServer: false });
           return parsedAll;
         }
       } catch (_) {}
     }
   }
 
-  // 3. Fallback instan ke DEFAULT_ACTIVE_FRAMES (22 frame ril dari D1/Supabase)
+  // 3. Fallback instan ke DEFAULT_ACTIVE_FRAMES (25 frame ril dari D1/Supabase)
   if (DEFAULT_ACTIVE_FRAMES && DEFAULT_ACTIVE_FRAMES.length > 0) {
-    memoryCache.set(cacheKey, { data: DEFAULT_ACTIVE_FRAMES, timestamp: Date.now() });
+    memoryCache.set(cacheKey, { data: DEFAULT_ACTIVE_FRAMES, timestamp: 0, isFromServer: false });
     return DEFAULT_ACTIVE_FRAMES;
   }
 
@@ -186,8 +192,9 @@ export async function fetchActiveFrames(
   const cached = memoryCache.get(cacheKey);
   const now = Date.now();
 
-  // Kembalikan langsung dari RAM jika masih fresh & tidak dipaksa refresh
-  if (!forceRefresh && cached && now - cached.timestamp < CACHE_TTL_MS) {
+  // Kembalikan langsung dari RAM HANYA jika data BENAR-BENAR sudah diambil dari server
+  // dan masih dalam rentang masa berlaku CACHE_TTL_MS (20 detik) serta tidak dipaksa refresh
+  if (!forceRefresh && cached && cached.isFromServer && now - cached.timestamp < CACHE_TTL_MS) {
     const isDummy = cached.data.length === 1 && (cached.data[0].id === 'default-strip-3' || cached.data[0].frame_id === 'default-frame-1');
     if (!isDummy) return cached.data;
   }
@@ -195,7 +202,7 @@ export async function fetchActiveFrames(
   // Cek cache sync untuk fast response
   const syncData = getCachedFramesSync(eventId);
 
-  // Jalankan query paralel ke Supabase
+  // Jalankan query paralel ke Cloudflare D1 / Supabase
   const queryPromise = (async () => {
     try {
       // 1. Eksekusi query frames dan frame_layouts secara PARALEL dengan Promise.all
@@ -322,21 +329,26 @@ export async function fetchActiveFrames(
         ];
       }
 
-      // Update cache
-      memoryCache.set(cacheKey, { data: items, timestamp: Date.now() });
-      memoryCache.set('event_all', { data: items, timestamp: Date.now() });
+      // Deteksi perubahan data dibanding cache saat ini
+      const prevIds = (cached?.data || syncData || []).map((x) => x.frame_id || x.id).join(',');
+      const newIds = items.map((x) => x.frame_id || x.id).join(',');
+      const hasChanged = prevIds !== newIds;
+
+      // Update cache dengan tanda isFromServer: true dan timestamp terkini
+      memoryCache.set(cacheKey, { data: items, timestamp: Date.now(), isFromServer: true });
+      memoryCache.set('event_all', { data: items, timestamp: Date.now(), isFromServer: true });
       safeSet(`photobooth_cached_frames_${cacheKey}`, JSON.stringify(items));
       safeSet('photobooth_cached_frames_event_all', JSON.stringify(items));
       if (eventId && eventId !== 'all') {
-        memoryCache.set(`event_${eventId}`, { data: items, timestamp: Date.now() });
+        memoryCache.set(`event_${eventId}`, { data: items, timestamp: Date.now(), isFromServer: true });
         safeSet(`photobooth_cached_frames_event_${eventId}`, JSON.stringify(items));
       }
 
       // Preload image thumbnails
       preloadFrameImages(items);
 
-      // Trigger event update jika ada komponen yang sedang mendengarkan
-      if (typeof window !== 'undefined') {
+      // Trigger event update hanya jika data berubah atau dipaksa refresh
+      if ((hasChanged || forceRefresh) && typeof window !== 'undefined') {
         window.dispatchEvent(
           new CustomEvent('photobooth_frames_refreshed', {
             detail: { eventId, frames: items },
@@ -351,8 +363,13 @@ export async function fetchActiveFrames(
     }
   })();
 
-  // Jika kita sudah punya sync data, kita kembalikan syncData dan biarkan queryPromise berjalan di background
-  if (syncData && syncData.length > 0 && !forceRefresh) {
+  // Jika forceRefresh = true, TUNGGU queryPromise agar data yang diterima dijamin 100% fresh dari server
+  if (forceRefresh) {
+    return await queryPromise;
+  }
+
+  // Jika kita sudah punya sync data dan tidak forceRefresh, kembalikan syncData dan biarkan queryPromise revalidate di background
+  if (syncData && syncData.length > 0) {
     queryPromise.catch(() => {});
     return syncData;
   }
@@ -370,9 +387,9 @@ export function prefetchFrames(eventId?: string): void {
     preloadFrameImages(cached);
   }
 
-  // 2. Fetch data frame terbaru dari Supabase dan preload gambar-gambarnya
+  // 2. Fetch data frame terbaru dari D1/Supabase dan preload gambar-gambarnya
   setTimeout(() => {
-    fetchActiveFrames(eventId, false)
+    fetchActiveFrames(eventId, true)
       .then((items) => {
         if (items && items.length > 0) {
           preloadFrameImages(items);
@@ -387,6 +404,7 @@ export function prefetchFrames(eventId?: string): void {
  */
 export function invalidateFrameCache(): void {
   memoryCache.clear();
+  clearClientQueryCache();
   try {
     if (typeof window !== 'undefined' && window.localStorage) {
       for (let i = 0; i < localStorage.length; i++) {
@@ -395,6 +413,7 @@ export function invalidateFrameCache(): void {
           localStorage.removeItem(key);
         }
       }
+      localStorage.setItem('photobooth_frames_last_invalidated', String(Date.now()));
       window.dispatchEvent(new CustomEvent('photobooth_frames_invalidated'));
     }
   } catch (_) {}
