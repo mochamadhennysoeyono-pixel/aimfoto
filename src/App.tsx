@@ -151,11 +151,11 @@ export default function App() {
         ) {
           const hFoto = parsed.hargaPerFoto !== undefined ? parsed.hargaPerFoto : 25000;
           return {
-            id: HARDCODED_EVENT_ID,
-            nama: 'AIM SPACE Studio',
-            subtitle: 'Photobooth Rumahan & Event — Abadikan Momen Spesial Berkualitas Tinggi',
-            tanggal: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }),
-            lokasi: 'AIM SPACE Studio',
+            id: parsed.id || HARDCODED_EVENT_ID,
+            nama: parsed.nama || 'AIM SPACE Studio',
+            subtitle: parsed.subtitle || 'Photobooth Rumahan & Event — Abadikan Momen Spesial Berkualitas Tinggi',
+            tanggal: parsed.tanggal || new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }),
+            lokasi: parsed.lokasi || 'AIM SPACE Studio',
             hargaPerFoto: hFoto,
             hargaDigital: parsed.hargaDigital !== undefined ? parsed.hargaDigital : (hFoto === 0 ? 0 : 10000),
             hargaPrint: parsed.hargaPrint !== undefined ? parsed.hargaPrint : (hFoto === 0 ? 0 : 25000),
@@ -164,7 +164,7 @@ export default function App() {
             promoBadge: parsed.promoBadge || 'Promo Spesial Studio Rumahan',
             promoDescription: parsed.promoDescription || 'Hasil foto tajam resolusi tinggi 300 DPI, pencahayaan optimal, & cetak instan!',
             cashInstruction: parsed.cashInstruction || 'Serahkan uang tunai langsung ke kasir atau operator photobooth',
-            tipeEvent: 'Studio Rumahan & Event',
+            tipeEvent: parsed.tipeEvent || 'Studio Rumahan & Event',
             ...parsed,
           };
         } else {

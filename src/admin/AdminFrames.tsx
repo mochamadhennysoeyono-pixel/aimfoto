@@ -427,7 +427,7 @@ export const AdminFrames: React.FC<AdminFramesProps> = ({ initialSelectedEventId
     try {
       let finalImageUrl = frameImageUrl;
 
-      // 1. Jika ada file upload baru, upload ke Supabase Storage
+      // 1. Jika ada file upload baru, upload ke Database Storage
       if (frameImageFile) {
         const fileExt = frameImageFile.name.split('.').pop() || 'png';
         const fileName = `frames/${Date.now()}_${generateUuid().substring(0, 8)}.${fileExt}`;
@@ -719,36 +719,15 @@ export const AdminFrames: React.FC<AdminFramesProps> = ({ initialSelectedEventId
         console.warn('Notice saat menghapus frame_layouts:', flError.message);
       }
 
-      // 3. Hapus frame dari tabel frames
-      const { data, error } = await supabase
+      // 3. Hapus frame dari Firestore collection frames
+      const { error } = await supabase
         .from('frames')
         .delete()
-        .eq('id', frameToDelete.id)
-        .select();
+        .eq('id', frameToDelete.id);
 
       if (error) {
-        console.warn('Error saat menghapus frame dari Supabase:', error);
-        if (error.code === '42501') {
-          // Row Level Security (RLS) membatasi akses DELETE
-          setRlsBlockedFrame(frameToDelete);
-          setFrameToDelete(null);
-          return;
-        } else if (error.code === '23503') {
-          // Terikat foreign key riwayat sesi/order foto
-          setErrorMsg(
-            `Frame "${frameToDelete.name}" tidak dapat dihapus permanen karena terikat dengan riwayat sesi/order foto yang tersimpan di database. Silakan nonaktifkan frame ini (ikon centang) agar tidak muncul di photobooth.`
-          );
-          setFrameToDelete(null);
-          return;
-        } else {
-          throw error;
-        }
-      } else if (!data || data.length === 0) {
-        // PostgREST RLS memblokir DELETE tanpa melempar error (0 baris terhapus)
-        console.warn('Supabase RLS memblokir operasi DELETE (0 baris terhapus):', frameToDelete.name);
-        setRlsBlockedFrame(frameToDelete);
-        setFrameToDelete(null);
-        return;
+        console.warn('Error saat menghapus frame dari Firestore:', error);
+        throw error;
       }
 
       // 4. Bersihkan layout slot di tabel layouts jika ada
@@ -797,13 +776,13 @@ export const AdminFrames: React.FC<AdminFramesProps> = ({ initialSelectedEventId
       fetchFrames();
     } catch (e: any) {
       console.error('Error deleting frame:', e);
-      setErrorMsg(`Gagal menghapus frame: ${e?.message || 'Terjadi kesalahan pada database Supabase'}`);
+      setErrorMsg(`Gagal menghapus frame: ${e?.message || 'Terjadi kesalahan pada database Database'}`);
     } finally {
       setIsDeleting(false);
     }
   };
 
-  // Alternatif: Nonaktifkan frame jika RLS Supabase memblokir operasi DELETE
+  // Alternatif: Nonaktifkan frame jika RLS Database memblokir operasi DELETE
   const handleDeactivateInstead = async (frame: FrameTheme) => {
     setIsDeactivatingInstead(true);
     try {
@@ -1461,7 +1440,7 @@ export const AdminFrames: React.FC<AdminFramesProps> = ({ initialSelectedEventId
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-white">
-                    Penghapusan Tertahan oleh Database Supabase
+                    Penghapusan Tertahan oleh Database Database
                   </h3>
                   <p className="text-[11px] text-zinc-400">
                     Row Level Security (RLS) pada tabel <code className="text-amber-300 font-mono">frames</code> membatasi izin DELETE
@@ -1484,16 +1463,16 @@ export const AdminFrames: React.FC<AdminFramesProps> = ({ initialSelectedEventId
                   Target Frame: <span className="text-white font-bold">{rlsBlockedFrame.name}</span>
                 </p>
                 <p className="text-[11px] text-zinc-400 leading-relaxed">
-                  Tabel <code className="text-zinc-200 font-mono">frames</code> atau <code className="text-zinc-200 font-mono">frame_layouts</code> di Supabase Anda saat ini mengaktifkan RLS dan belum memiliki hak izin operasi <code className="text-amber-400 font-mono">DELETE</code> untuk public/anon. Oleh sebab itu, Supabase menolak query hapus dan saat halaman dimuat ulang, data tersebut ditarik kembali dari server.
+                  Tabel <code className="text-zinc-200 font-mono">frames</code> atau <code className="text-zinc-200 font-mono">frame_layouts</code> di Database Anda saat ini mengaktifkan RLS dan belum memiliki hak izin operasi <code className="text-amber-400 font-mono">DELETE</code> untuk public/anon. Oleh sebab itu, Database menolak query hapus dan saat halaman dimuat ulang, data tersebut ditarik kembali dari server.
                 </p>
               </div>
 
-              {/* Kotak SQL Query untuk Dijalankan di Supabase */}
+              {/* Kotak SQL Query untuk Dijalankan di Database */}
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold text-zinc-300 flex items-center gap-1.5">
                     <Database className="w-3.5 h-3.5 text-amber-400" />
-                    Solusi Permanen (Jalankan 1x di Supabase SQL Editor):
+                    Solusi Permanen (Jalankan 1x di Database SQL Editor):
                   </span>
                   <button
                     type="button"
@@ -1520,13 +1499,13 @@ export const AdminFrames: React.FC<AdminFramesProps> = ({ initialSelectedEventId
                 </div>
 
                 <pre className="p-3 rounded-xl bg-zinc-950 border border-zinc-800 text-[11px] font-mono text-zinc-200 overflow-x-auto select-all leading-relaxed">
-{`-- Salin dan jalankan di menu SQL Editor di Supabase:
+{`-- Salin dan jalankan di menu SQL Editor di Database:
 ALTER TABLE frames DISABLE ROW LEVEL SECURITY;
 ALTER TABLE frame_layouts DISABLE ROW LEVEL SECURITY;`}
                 </pre>
 
                 <ol className="text-[11px] text-zinc-400 list-decimal list-inside space-y-0.5 pt-1">
-                  <li>Buka dashboard Supabase project Anda</li>
+                  <li>Buka dashboard Database project Anda</li>
                   <li>Pilih menu <strong>SQL Editor</strong> di sidebar kiri</li>
                   <li>Tempelkan (Paste) 2 baris perintah di atas lalu klik tombol <strong>Run</strong></li>
                   <li>Setelah itu, semua frame dapat langsung dihapus permanen</li>

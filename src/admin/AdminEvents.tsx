@@ -113,7 +113,7 @@ export const AdminEvents: React.FC<AdminEventsProps> = ({
   const [editIsActive, setEditIsActive] = useState(true);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
 
-  // Fetch all events from Supabase
+  // Fetch all events from Database
   const fetchEvents = useCallback(async () => {
     setIsLoading(true);
     setErrorMsg(null);
@@ -181,7 +181,7 @@ export const AdminEvents: React.FC<AdminEventsProps> = ({
 
         cachedAdminEvents = cleanedData;
         setEvents(cleanedData);
-        // Cari event yang memiliki is_default = true di Supabase
+        // Cari event yang memiliki is_default = true di Database
         const foundDefault = cleanedData.find((ev) => ev.is_default);
         if (foundDefault) {
           setDefaultEventId(foundDefault.id);
@@ -192,7 +192,7 @@ export const AdminEvents: React.FC<AdminEventsProps> = ({
       }
     } catch (err: any) {
       console.warn('Network error fetching events:', err);
-      setErrorMsg(err.message || 'Gagal tersambung ke Supabase');
+      setErrorMsg(err.message || 'Gagal tersambung ke Database');
     } finally {
       setIsLoading(false);
     }
@@ -251,7 +251,7 @@ export const AdminEvents: React.FC<AdminEventsProps> = ({
         .insert([payload])
         .select();
 
-      // Jika kolom is_default belum ada di database Supabase, fallback insert tanpa kolom tersebut
+      // Jika kolom is_default belum ada di database Database, fallback insert tanpa kolom tersebut
       if (error && (error.code === '42703' || error.message?.includes('is_default'))) {
         delete payload.is_default;
         const retryResult = await supabase
@@ -264,9 +264,9 @@ export const AdminEvents: React.FC<AdminEventsProps> = ({
 
       if (error) {
         if (error.code === '42501') {
-          // Supabase RLS error explanation
+          // Database RLS error explanation
           setErrorMsg(
-            `Supabase RLS Error: Row-Level Security menolak insert. Jalankan SQL ini di Supabase SQL Editor: ALTER TABLE events DISABLE ROW LEVEL SECURITY; atau buat policy INSERT publik.`
+            `Database RLS Error: Row-Level Security menolak insert. Jalankan SQL ini di Database SQL Editor: ALTER TABLE events DISABLE ROW LEVEL SECURITY; atau buat policy INSERT publik.`
           );
         } else {
           setErrorMsg(`Gagal menambah event: ${error.message}`);
@@ -324,7 +324,7 @@ export const AdminEvents: React.FC<AdminEventsProps> = ({
                 },
               })
             );
-            // Coba un-default event lain di Supabase jika kolom is_default ada
+            // Coba un-default event lain di Database jika kolom is_default ada
             await supabase.from('events').update({ is_default: false }).neq('id', newId);
           } catch (storageErr) {
             console.log('Catatan simpan default event:', storageErr);
@@ -522,7 +522,7 @@ export const AdminEvents: React.FC<AdminEventsProps> = ({
     }
   };
 
-  // Confirm delete event from Supabase
+  // Confirm delete event from Database
   const handleConfirmDelete = async () => {
     if (!eventToDelete) return;
 
@@ -541,33 +541,17 @@ export const AdminEvents: React.FC<AdminEventsProps> = ({
         console.log('Frames cleanup note:', frameErr);
       }
 
-      // 2. Delete event from Supabase 'events' table and inspect returned data
-      const { data, error } = await supabase
+      // 2. Delete event from Firestore 'events' collection
+      const { error } = await supabase
         .from('events')
         .delete()
-        .eq('id', eventToDelete.id)
-        .select();
+        .eq('id', eventToDelete.id);
 
       if (error) {
-        console.warn('Gagal menghapus event dari Supabase:', error);
-        if (error.code === '42501') {
-          // Explicit permission denied by Supabase RLS
-          setRlsBlockedEvent(eventToDelete);
-          setEventToDelete(null);
-        } else if (error.code === '23503') {
-          setErrorMsg(
-            'Event ini memiliki riwayat transaksi/sesi foto yang tersimpan di Supabase. Database mencegah penghapusan agar data riwayat tidak rusak. Silakan ubah status event menjadi Nonaktif.'
-          );
-        } else {
-          setErrorMsg(`Gagal menghapus event: ${error.message}`);
-        }
-      } else if (!data || data.length === 0) {
-        // PostgREST RLS silently returned 0 rows because DELETE policy is missing!
-        console.warn('Supabase RLS memblokir operasi DELETE (0 baris terhapus):', eventToDelete.name);
-        setRlsBlockedEvent(eventToDelete);
-        setEventToDelete(null);
+        console.warn('Gagal menghapus event dari Firestore:', error);
+        setErrorMsg(`Gagal menghapus event: ${error.message}`);
       } else {
-        setSuccessMsg(`Event "${eventToDelete.name}" (${eventToDelete.qr_code}) berhasil dihapus permanen dari Supabase.`);
+        setSuccessMsg(`Event "${eventToDelete.name}" (${eventToDelete.qr_code}) berhasil dihapus permanen.`);
         setEvents((prev) => prev.filter((item) => item.id !== eventToDelete.id));
         setEventToDelete(null);
       }
@@ -664,12 +648,12 @@ export const AdminEvents: React.FC<AdminEventsProps> = ({
         }))
       );
 
-      // Update kolom is_default di Supabase
+      // Update kolom is_default di Database
       try {
         await supabase.from('events').update({ is_default: false }).neq('id', ev.id);
         await supabase.from('events').update({ is_default: true }).eq('id', ev.id);
       } catch (dbErr) {
-        console.log('Update is_default Supabase catatan:', dbErr);
+        console.log('Update is_default Database catatan:', dbErr);
       }
 
       setSuccessMsg(`Event "${ev.name}" dijadikan Default Event untuk halaman awal!`);
@@ -1069,7 +1053,7 @@ export const AdminEvents: React.FC<AdminEventsProps> = ({
                 <tr>
                   <td colSpan={6} className="py-12 text-center text-zinc-500 font-mono">
                     <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-amber-400" />
-                    Memuat data events dari Supabase...
+                    Memuat data events dari Database...
                   </td>
                 </tr>
               ) : filteredEvents.length === 0 ? (
@@ -1573,7 +1557,7 @@ export const AdminEvents: React.FC<AdminEventsProps> = ({
         </div>
       )}
 
-      {/* Modal Panduan Supabase RLS Saat Penghapusan Diblokir */}
+      {/* Modal Panduan Database RLS Saat Penghapusan Diblokir */}
       {rlsBlockedEvent && (
         <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-hidden">
           <div className="w-full max-w-lg bg-zinc-900 border border-amber-500/40 rounded-2xl shadow-2xl flex flex-col max-h-[85vh] overflow-hidden animate-in fade-in zoom-in-95 duration-150">
@@ -1584,7 +1568,7 @@ export const AdminEvents: React.FC<AdminEventsProps> = ({
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-white">
-                    Penghapusan Tertahan oleh Database Supabase
+                    Penghapusan Tertahan oleh Database Database
                   </h3>
                   <p className="text-[11px] text-zinc-400">
                     Row Level Security (RLS) pada tabel events membatasi izin DELETE
@@ -1607,16 +1591,16 @@ export const AdminEvents: React.FC<AdminEventsProps> = ({
                   <span className="font-mono text-amber-400 text-[11px]">({rlsBlockedEvent.qr_code})</span>
                 </p>
                 <p className="text-[11px] text-zinc-400 leading-relaxed">
-                  Tabel <code className="text-zinc-200 font-mono">events</code> di Supabase mengaktifkan RLS dan belum memiliki hak izin operasi <code className="text-amber-400 font-mono">DELETE</code> untuk public/anon. Oleh karena itu, Supabase menolak penghapusan baris dan saat Anda merefresh halaman, data tersebut ditarik kembali.
+                  Tabel <code className="text-zinc-200 font-mono">events</code> di Database mengaktifkan RLS dan belum memiliki hak izin operasi <code className="text-amber-400 font-mono">DELETE</code> untuk public/anon. Oleh karena itu, Database menolak penghapusan baris dan saat Anda merefresh halaman, data tersebut ditarik kembali.
                 </p>
               </div>
 
-              {/* Kotak SQL Query untuk Dijalankan di Supabase */}
+              {/* Kotak SQL Query untuk Dijalankan di Database */}
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold text-zinc-300 flex items-center gap-1.5">
                     <Database className="w-3.5 h-3.5 text-amber-400" />
-                    Solusi Permanen (Jalankan 1x di Supabase SQL Editor):
+                    Solusi Permanen (Jalankan 1x di Database SQL Editor):
                   </span>
                   <button
                     type="button"
@@ -1643,13 +1627,13 @@ export const AdminEvents: React.FC<AdminEventsProps> = ({
                 </div>
 
                 <pre className="p-3 rounded-xl bg-zinc-950 border border-zinc-800 text-[11px] font-mono text-zinc-200 overflow-x-auto select-all leading-relaxed">
-{`-- Salin dan jalankan di menu SQL Editor di Supabase:
+{`-- Salin dan jalankan di menu SQL Editor di Database:
 ALTER TABLE events DISABLE ROW LEVEL SECURITY;
 ALTER TABLE frames DISABLE ROW LEVEL SECURITY;`}
                 </pre>
 
                 <ol className="text-[11px] text-zinc-400 list-decimal list-inside space-y-0.5 pt-1">
-                  <li>Buka dashboard Supabase project Anda</li>
+                  <li>Buka dashboard Database project Anda</li>
                   <li>Pilih tab <strong>SQL Editor</strong> di sidebar kiri</li>
                   <li>Tempel (Paste) perintah di atas lalu klik tombol <strong>Run</strong></li>
                   <li>Setelah itu, event akan langsung terhapus permanen saat tombol hapus diklik</li>
