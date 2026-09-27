@@ -1,0 +1,134 @@
+{
+  "entities": {
+    "Event": {
+      "title": "Event",
+      "description": "Photobooth event configuration",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "price": { "type": "number" },
+        "default_price": { "type": "number" },
+        "free_mode": { "type": "boolean" },
+        "is_active": { "type": "boolean" },
+        "is_default": { "type": "boolean" },
+        "qr_code": { "type": "string" },
+        "passcode": { "type": "string" },
+        "created_at": { "type": "string" }
+      },
+      "required": ["id", "name"]
+    },
+    "Frame": {
+      "title": "Frame",
+      "description": "Photobooth decorative frame theme",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "event_id": { "type": "string" },
+        "name": { "type": "string" },
+        "image_url": { "type": "string" },
+        "sort_order": { "type": "number" },
+        "is_active": { "type": "boolean" },
+        "category": { "type": "string" },
+        "created_at": { "type": "string" }
+      },
+      "required": ["id", "name", "image_url"]
+    },
+    "Layout": {
+      "title": "Layout",
+      "description": "Slot layout geometry and aspect ratio",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "photo_count": { "type": "number" },
+        "ratio": { "type": "string" },
+        "canvas_width": { "type": "number" },
+        "canvas_height": { "type": "number" },
+        "is_active": { "type": "boolean" }
+      },
+      "required": ["id", "name", "photo_count"]
+    },
+    "FrameLayout": {
+      "title": "FrameLayout",
+      "description": "Combination mapping between frames and layouts",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "frame_id": { "type": "string" },
+        "layout_id": { "type": "string" },
+        "image_url": { "type": "string" },
+        "category": { "type": "string" }
+      },
+      "required": ["id", "frame_id", "layout_id"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "Customer photobooth payment and order state",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "sessionId": { "type": "string" },
+        "harga": { "type": "number" },
+        "statusPembayaran": { "type": "string" },
+        "waktuCheckout": { "type": "string" },
+        "created_at": { "type": "string" }
+      },
+      "required": ["id", "statusPembayaran"]
+    },
+    "Session": {
+      "title": "Session",
+      "description": "Active photobooth capture session and photo URLs",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "status": { "type": "string" },
+        "eventId": { "type": "string" },
+        "final_url": { "type": "string" },
+        "video_url": { "type": "string" },
+        "created_at": { "type": "string" }
+      },
+      "required": ["id"]
+    },
+    "Config": {
+      "title": "Config",
+      "description": "System and administrative configurations",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "value": { "type": "string" }
+      },
+      "required": ["id"]
+    }
+  },
+  "firestore": {
+    "/events/{eventId}": {
+      "schema": "Event",
+      "description": "Event configurations"
+    },
+    "/frames/{frameId}": {
+      "schema": "Frame",
+      "description": "Frames collection"
+    },
+    "/layouts/{layoutId}": {
+      "schema": "Layout",
+      "description": "Layouts collection"
+    },
+    "/frame_layouts/{frameLayoutId}": {
+      "schema": "FrameLayout",
+      "description": "Frame to layout combination mapping"
+    },
+    "/orders/{orderId}": {
+      "schema": "Order",
+      "description": "Orders collection"
+    },
+    "/sessions/{sessionId}": {
+      "schema": "Session",
+      "description": "Sessions collection"
+    },
+    "/configs/{configId}": {
+      "schema": "Config",
+      "description": "System configs collection"
+    }
+  }
+}

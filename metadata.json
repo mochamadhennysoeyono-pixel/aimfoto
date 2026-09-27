@@ -1,0 +1,10 @@
+{
+  "name": "AIMSPACE Photobooth Kiosk",
+  "description": "Aplikasi photobooth digital kiosk interaktif AIMSPACE dengan sesi foto cetak & boomerang video soft file, filter real-time, pilihan custom frame, checkout instan, dan cetak cepat.",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
