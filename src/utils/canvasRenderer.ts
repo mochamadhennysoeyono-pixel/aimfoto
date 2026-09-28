@@ -334,8 +334,15 @@ export async function renderCompositedPhoto({
             ctx.filter = filter.cssFilter;
           }
 
-          // Gambar foto secara utuh (kelihatan full tanpa crop)
-          ctx.drawImage(photoImg, pixelX, pixelY, pixelW, pixelH);
+          // Gambar foto secara proporsional anti-stretch (preserve natural aspect ratio)
+          const targetBoxAspect = pixelW / pixelH;
+          if (Math.abs(imgAspect - targetBoxAspect) < 0.02) {
+            // Rasio sudah cocok persis (misal hasil bidik adaptive camera)
+            ctx.drawImage(photoImg, pixelX, pixelY, pixelW, pixelH);
+          } else {
+            // Jika ada perbedaan rasio (misal slot ditarik bebas), potong cover secara proporsional tanpa merenggangkan wajah
+            drawCoverImage(ctx, photoImg, pixelX, pixelY, pixelW, pixelH, adj, 'cover');
+          }
 
           // Optional tint
           if (filter.tint) {

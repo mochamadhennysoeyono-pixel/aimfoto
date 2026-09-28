@@ -462,7 +462,7 @@ export const Step7Overlay: React.FC<Step7OverlayProps> = ({
               <img
                 src={photoSrc}
                 alt={`Slot ${i + 1}`}
-                className="w-full h-full object-contain pointer-events-none"
+                className="w-full h-full object-cover pointer-events-none"
                 style={{
                   filter: filter ? filter.cssFilter : 'none',
                 }}

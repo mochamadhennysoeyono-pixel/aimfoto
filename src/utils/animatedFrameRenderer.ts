@@ -386,7 +386,13 @@ export function drawSingleAnimatedFrame(
           ctx.filter = filter.cssFilter;
         }
 
-        ctx.drawImage(sourceDrawable, pixelX, pixelY, pixelW, pixelH);
+        // Gambar secara proporsional anti-stretch
+        const targetBoxAspect = pixelW / pixelH;
+        if (Math.abs(imgAspect - targetBoxAspect) < 0.02) {
+          ctx.drawImage(sourceDrawable, pixelX, pixelY, pixelW, pixelH);
+        } else {
+          drawCoverImage(ctx, sourceDrawable, pixelX, pixelY, pixelW, pixelH, adj, 'cover');
+        }
 
         // Filter Tint
         if (filter.tint) {

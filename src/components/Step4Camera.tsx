@@ -21,6 +21,7 @@ import {
   Copy,
   Bookmark,
   Image as ImageIcon,
+  Frame,
 } from 'lucide-react';
 import { PhotoboothLayout } from '../types';
 import {
@@ -142,6 +143,10 @@ export const Step4Camera: React.FC<Step4CameraProps> = ({
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [cameraError, setCameraError] = useState<string | null>(null);
 
+  // Camera aspect ratio mode: '4:3' (default), '3:4', or 'slot' (auto fits slot exactly, 100% full view)
+  const [viewfinderMode, setViewfinderMode] = useState<'4:3' | '3:4' | 'slot'>('4:3');
+  const [showGuideOverlay, setShowGuideOverlay] = useState(false);
+
   // Preview Modal for individual Boomerang
   const [previewModalSlot, setPreviewModalSlot] = useState<number | null>(null);
   const [slotOptionsModal, setSlotOptionsModal] = useState<number | null>(null);
@@ -218,6 +223,63 @@ export const Step4Camera: React.FC<Step4CameraProps> = ({
   // Target Slot being processed
   const currentTargetSlot = activeRetakeIndex !== null ? activeRetakeIndex : activeSlotIndex;
 
+  // Calculate dynamic aspect ratio for current slot (e.g. 4:3, 1:1, 3:4, etc.)
+  const activeSlot = layout?.slots?.[currentTargetSlot] || layout?.slots?.[0];
+  const canvasW = layout?.canvas_width || (layout as any)?.canvasWidth || 1200;
+  const canvasH = layout?.canvas_height || (layout as any)?.canvasHeight || 1800;
+
+  // Physical slot aspect ratio = (slot.width% * canvasW) / (slot.height% * canvasH)
+  const slotPhysicalRatio = React.useMemo(() => {
+    if (activeSlot && activeSlot.width && activeSlot.height) {
+      const pW = (activeSlot.width / 100) * canvasW;
+      const pH = (activeSlot.height / 100) * canvasH;
+      if (pW > 0 && pH > 0) {
+        return pW / pH;
+      }
+    }
+    // Default safe ratio: 4:3 (kamera sensor standar)
+    return 4 / 3;
+  }, [activeSlot, canvasW, canvasH]);
+
+  // Current effective aspect ratio according to mode
+  const currentEffectiveRatio = React.useMemo(() => {
+    if (viewfinderMode === '4:3') return 4 / 3;
+    if (viewfinderMode === '3:4') return 3 / 4;
+    // 'slot' matches current target slot perfectly (100% full view, zero blackout letterbox)
+    return slotPhysicalRatio;
+  }, [viewfinderMode, slotPhysicalRatio]);
+
+  // Kalkulasi kotak panduan frame (Guide Overlay Box) di dalam jendela bidik kamera
+  const guideBox = React.useMemo(() => {
+    if (viewfinderMode === 'slot') {
+      return {
+        widthPct: 100,
+        heightPct: 100,
+        slotAspect: slotPhysicalRatio,
+      };
+    }
+
+    const targetAspect = slotPhysicalRatio;
+    const camAspect = currentEffectiveRatio;
+
+    let widthPct = 100;
+    let heightPct = 100;
+
+    if (targetAspect < camAspect) {
+      widthPct = (targetAspect / camAspect) * 100;
+      heightPct = 100;
+    } else {
+      widthPct = 100;
+      heightPct = (camAspect / targetAspect) * 100;
+    }
+
+    return {
+      widthPct: Math.min(100, Math.max(15, widthPct)),
+      heightPct: Math.min(100, Math.max(15, heightPct)),
+      slotAspect: targetAspect,
+    };
+  }, [viewfinderMode, slotPhysicalRatio, currentEffectiveRatio]);
+
   // Determine if session is 100% complete
   const isPhotosComplete =
     capturedPhotos.length >= targetPhotoCount &&
@@ -230,7 +292,7 @@ export const Step4Camera: React.FC<Step4CameraProps> = ({
 
   const isAllComplete = isPhotosComplete && isBoomerangComplete && activeRetakeIndex === null;
 
-  // Trigger snapshot (Photo stage)
+  // Trigger snapshot (Photo stage) beresolusi tinggi dengan rasio natural 4:3 atau 3:4
   const takeSnapshot = useCallback((): string | null => {
     const video = videoRef.current;
     const canvas = canvasRef.current;
@@ -244,12 +306,33 @@ export const Step4Camera: React.FC<Step4CameraProps> = ({
 
     const vW = video.videoWidth || 1280;
     const vH = video.videoHeight || 960;
-    const minDim = Math.min(vW, vH);
-    const sx = (vW - minDim) / 2;
-    const sy = (vH - minDim) / 2;
+    const videoAspect = vW / vH;
+    const targetAspect = currentEffectiveRatio;
 
-    canvas.width = minDim;
-    canvas.height = minDim;
+    // Center crop based on targetAspect without stretching
+    let cropW = vW;
+    let cropH = vH;
+    if (videoAspect > targetAspect) {
+      cropW = vH * targetAspect;
+      cropH = vH;
+    } else {
+      cropW = vW;
+      cropH = vW / targetAspect;
+    }
+
+    const sx = Math.max(0, (vW - cropW) / 2);
+    const sy = Math.max(0, (vH - cropH) / 2);
+
+    // High resolution output standard matching current aspect ratio
+    const outputMaxDim = 1600;
+    if (targetAspect >= 1) {
+      canvas.width = outputMaxDim;
+      canvas.height = Math.round(outputMaxDim / targetAspect);
+    } else {
+      canvas.height = outputMaxDim;
+      canvas.width = Math.round(outputMaxDim * targetAspect);
+    }
+
     const ctx = canvas.getContext('2d');
     if (!ctx) return null;
 
@@ -257,7 +340,7 @@ export const Step4Camera: React.FC<Step4CameraProps> = ({
       ctx.translate(canvas.width, 0);
       ctx.scale(-1, 1);
     }
-    ctx.drawImage(video, sx, sy, minDim, minDim, 0, 0, minDim, minDim);
+    ctx.drawImage(video, sx, sy, cropW, cropH, 0, 0, canvas.width, canvas.height);
 
     if (facingMode === 'user') {
       ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -265,7 +348,7 @@ export const Step4Camera: React.FC<Step4CameraProps> = ({
 
     const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
     return dataUrl;
-  }, [facingMode, soundEnabled]);
+  }, [facingMode, soundEnabled, currentEffectiveRatio]);
 
   // Record Boomerang clip (Boomerang stage)
   const recordBoomerangForSlot = async (slotIdx: number) => {
@@ -276,13 +359,21 @@ export const Step4Camera: React.FC<Step4CameraProps> = ({
     setBoomerangProgress(0);
     if (soundEnabled) playBoomerangWhoosh();
 
+    const targetAspect = currentEffectiveRatio;
+    let bW = 720;
+    let bH = Math.round(720 / targetAspect);
+    if (targetAspect < 1) {
+      bH = 720;
+      bW = Math.round(720 * targetAspect);
+    }
+
     try {
       const { frames, previewDataUrl } = await captureBoomerangFrames(video, {
         durationMs: 1300, // 1.3 detik burst Instagram Boomerang responsif & lincah
         targetFps: 24,
         facingMode,
-        width: 720,
-        height: 720,
+        width: bW,
+        height: bH,
         onProgress: (pct) => setBoomerangProgress(pct),
       });
 
@@ -865,16 +956,22 @@ export const Step4Camera: React.FC<Step4CameraProps> = ({
         </div>
       </div>
 
-      {/* Live Viewfinder Area (1:1 Square) */}
-      <div
-        className={`relative w-full aspect-square bg-zinc-950 rounded-2xl overflow-hidden shadow-2xl my-2 flex items-center justify-center shrink-0 select-none transition-all duration-300 ${
-          isRecordingBoomerang
-            ? 'ring-4 ring-rose-500 ring-offset-2 ring-offset-black animate-pulse'
-            : currentSubStage === 'boomerang'
-            ? 'border-2 border-pink-500/60 shadow-pink-500/10'
-            : 'border border-zinc-800'
-        }`}
-      >
+      {/* Live Viewfinder Area (Slot Frame WYSIWYG / 4:3 / 3:4) */}
+      <div className="relative w-full flex items-center justify-center my-2 shrink-0 select-none">
+        <div
+          style={{
+            aspectRatio: `${currentEffectiveRatio}`,
+            maxHeight: '60vh',
+            maxWidth: '100%',
+          }}
+          className={`relative w-full bg-zinc-950 rounded-2xl overflow-hidden shadow-2xl flex items-center justify-center transition-all duration-300 ${
+            isRecordingBoomerang
+              ? 'ring-4 ring-rose-500 ring-offset-2 ring-offset-black animate-pulse'
+              : currentSubStage === 'boomerang'
+              ? 'border-2 border-pink-500/60 shadow-pink-500/10'
+              : 'border border-zinc-800'
+          }`}
+        >
         {/* Flash screen overlay */}
         {isFlashing && <div className="absolute inset-0 bg-white z-40 animate-out fade-out" />}
 
@@ -886,6 +983,92 @@ export const Step4Camera: React.FC<Step4CameraProps> = ({
           muted
           className={`w-full h-full object-cover pointer-events-none ${facingMode === 'user' ? 'scale-x-[-1]' : ''}`}
         />
+
+        {/* Panduan Garis Frame Cetak (Mode 4:3 / 3:4 dengan Shading Lembut) */}
+        {showGuideOverlay && viewfinderMode !== 'slot' && (
+          <div className="absolute inset-0 pointer-events-none z-10 flex items-center justify-center overflow-hidden">
+            {/* Shaded margin outside guide boundary (Left & Right) - lembut transparan */}
+            {guideBox.widthPct < 99.5 && (
+              <>
+                <div
+                  className="absolute top-0 bottom-0 left-0 bg-black/35 border-r border-amber-400/50 transition-all duration-300"
+                  style={{ width: `${(100 - guideBox.widthPct) / 2}%` }}
+                />
+                <div
+                  className="absolute top-0 bottom-0 right-0 bg-black/35 border-l border-amber-400/50 transition-all duration-300"
+                  style={{ width: `${(100 - guideBox.widthPct) / 2}%` }}
+                />
+              </>
+            )}
+
+            {/* Shaded margin outside guide boundary (Top & Bottom) - lembut transparan */}
+            {guideBox.heightPct < 99.5 && (
+              <>
+                <div
+                  className="absolute top-0 left-0 right-0 bg-black/35 border-b border-amber-400/50 transition-all duration-300"
+                  style={{ height: `${(100 - guideBox.heightPct) / 2}%` }}
+                />
+                <div
+                  className="absolute bottom-0 left-0 right-0 bg-black/35 border-t border-amber-400/50 transition-all duration-300"
+                  style={{ height: `${(100 - guideBox.heightPct) / 2}%` }}
+                />
+              </>
+            )}
+
+            {/* Bounding Box Slot Frame */}
+            <div
+              className="relative pointer-events-none transition-all duration-300 border-2 border-amber-400/80 shadow-[0_0_20px_rgba(251,191,36,0.25)] rounded-lg flex items-center justify-center"
+              style={{
+                width: `${guideBox.widthPct}%`,
+                height: `${guideBox.heightPct}%`,
+              }}
+            >
+              {/* Corner brackets */}
+              <div className="absolute -top-1 -left-1 w-5 h-5 border-t-[3px] border-l-[3px] border-amber-400 rounded-tl" />
+              <div className="absolute -top-1 -right-1 w-5 h-5 border-t-[3px] border-r-[3px] border-amber-400 rounded-tr" />
+              <div className="absolute -bottom-1 -left-1 w-5 h-5 border-b-[3px] border-l-[3px] border-amber-400 rounded-bl" />
+              <div className="absolute -bottom-1 -right-1 w-5 h-5 border-b-[3px] border-r-[3px] border-amber-400 rounded-br" />
+
+              {/* Center subtle crosshair */}
+              <div className="absolute inset-0 flex items-center justify-center opacity-30">
+                <div className="w-6 h-[1px] bg-amber-300" />
+                <div className="h-6 w-[1px] bg-amber-300 absolute" />
+              </div>
+
+              {/* Slot Frame Label Badge */}
+              <div className="absolute top-2 left-1/2 -translate-x-1/2 px-2.5 py-0.5 rounded-full bg-black/85 border border-amber-400/60 backdrop-blur-md text-[10px] font-mono text-amber-300 whitespace-nowrap shadow-md flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                <span>
+                  Batas Slot #{currentTargetSlot + 1} (
+                  {Math.abs(guideBox.slotAspect - 1) < 0.05
+                    ? 'Kotak 1:1'
+                    : guideBox.slotAspect > 1.2
+                    ? 'Persegi Lebar'
+                    : guideBox.slotAspect < 0.85
+                    ? 'Persegi Tegak'
+                    : `${Math.round(guideBox.slotAspect * 10) / 10}`}
+                  )
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Panduan Garis Frame Cetak (Mode 'slot' Pas Frame 100% Lega Tanpa Area Terpotong) */}
+        {showGuideOverlay && viewfinderMode === 'slot' && (
+          <div className="absolute inset-0 pointer-events-none z-10 flex items-center justify-center">
+            {/* Corner brackets di ujung layar bidik */}
+            <div className="absolute top-2 left-2 w-5 h-5 border-t-[3px] border-l-[3px] border-amber-400 rounded-tl" />
+            <div className="absolute top-2 right-2 w-5 h-5 border-t-[3px] border-r-[3px] border-amber-400 rounded-tr" />
+            <div className="absolute bottom-2 left-2 w-5 h-5 border-b-[3px] border-l-[3px] border-amber-400 rounded-bl" />
+            <div className="absolute bottom-2 right-2 w-5 h-5 border-b-[3px] border-r-[3px] border-amber-400 rounded-br" />
+
+            <div className="absolute top-2 left-1/2 -translate-x-1/2 px-2.5 py-0.5 rounded-full bg-black/85 border border-emerald-400/60 backdrop-blur-md text-[10px] font-mono text-emerald-300 whitespace-nowrap shadow-md flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              <span>Area Slot #{currentTargetSlot + 1} (100% Masuk Frame)</span>
+            </div>
+          </div>
+        )}
 
         {/* Large Countdown Overlay */}
         {countdown !== null && (
@@ -950,32 +1133,71 @@ export const Step4Camera: React.FC<Step4CameraProps> = ({
           <div />
         </div>
 
-        {/* Top Controls Overlay inside Viewfinder */}
-        <div className="absolute top-3 left-3 right-3 flex items-center justify-between z-20">
-          <button
-            onClick={() => setTimerDuration((prev) => (prev === 3 ? 5 : prev === 5 ? 0 : 3))}
-            className="px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-white text-[11px] font-mono flex items-center gap-1 cursor-pointer hover:bg-black/80"
-          >
-            <Clock className="w-3 h-3 text-amber-400" />
-            <span>{timerDuration === 0 ? 'Tanpa Timer' : `${timerDuration}s Timer`}</span>
-          </button>
+          {/* Top Controls Overlay inside Viewfinder */}
+          <div className="absolute top-3 left-3 right-3 flex items-center justify-between z-20">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {/* Timer */}
+              <button
+                onClick={() => setTimerDuration((prev) => (prev === 3 ? 5 : prev === 5 ? 0 : 3))}
+                className="px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-white text-[11px] font-mono flex items-center gap-1 cursor-pointer hover:bg-black/80"
+              >
+                <Clock className="w-3 h-3 text-amber-400" />
+                <span>{timerDuration === 0 ? 'Tanpa Timer' : `${timerDuration}s`}</span>
+              </button>
 
-          <div className="flex items-center gap-1.5">
-            <button
-              onClick={() => setSoundEnabled(!soundEnabled)}
-              className="p-2 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-white hover:text-amber-300 transition-colors cursor-pointer"
-            >
-              {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4 text-zinc-500" />}
-            </button>
+              {/* Rasio Kamera Viewfinder */}
+              <button
+                type="button"
+                onClick={() => {
+                  setViewfinderMode((prev) => {
+                    if (prev === '4:3') return '3:4';
+                    if (prev === '3:4') return 'slot';
+                    return '4:3';
+                  });
+                }}
+                className="px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-white text-[11px] font-mono flex items-center gap-1 cursor-pointer hover:bg-black/80"
+                title="Ganti mode bidikan: 4:3 / 3:4 / Pas Frame (100% Lega)"
+              >
+                <span className="text-amber-400 font-bold">Kamera:</span>
+                <span className="font-semibold uppercase text-zinc-200">
+                  {viewfinderMode === 'slot' ? 'Pas Frame (100%)' : viewfinderMode}
+                </span>
+              </button>
 
-            <button
-              onClick={toggleFacingMode}
-              className="p-2 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-white hover:text-amber-300 transition-colors cursor-pointer"
-            >
-              <FlipHorizontal className="w-4 h-4" />
-            </button>
+              {/* Tombol Toggle Panduan Garis Frame */}
+              <button
+                type="button"
+                onClick={() => setShowGuideOverlay((prev) => !prev)}
+                className={`px-2.5 py-1 rounded-full backdrop-blur-md border text-[11px] font-mono flex items-center gap-1.5 cursor-pointer transition-colors ${
+                  showGuideOverlay
+                    ? 'bg-amber-500/20 border-amber-400/50 text-amber-300'
+                    : 'bg-black/60 border-white/10 text-zinc-400 hover:text-white'
+                }`}
+                title="Tampilkan / Sembunyikan Garis Panduan Frame"
+              >
+                <Frame className="w-3 h-3 text-amber-400" />
+                <span>Panduan: {showGuideOverlay ? 'ON' : 'OFF'}</span>
+              </button>
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => setSoundEnabled(!soundEnabled)}
+                className="p-2 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-white hover:text-amber-300 transition-colors cursor-pointer"
+                title="Suara Shutter"
+              >
+                {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4 text-zinc-500" />}
+              </button>
+
+              <button
+                onClick={toggleFacingMode}
+                className="p-2 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-white hover:text-amber-300 transition-colors cursor-pointer"
+                title="Balik Kamera Depan/Belakang"
+              >
+                <FlipHorizontal className="w-4 h-4" />
+              </button>
+            </div>
           </div>
-        </div>
 
         {/* Floating Shutter Overlay Button inside Viewfinder */}
         {!isAllComplete && !cameraError && !isRecordingBoomerang && !isCompilingBoomerang && (
@@ -1041,6 +1263,7 @@ export const Step4Camera: React.FC<Step4CameraProps> = ({
             </div>
           </div>
         )}
+        </div>
       </div>
 
       {/* Captured Slots Tray (Shows both Photo and Boomerang per slot) */}
